@@ -170,6 +170,24 @@
   .xls-btn { background:transparent; color:var(--amarillo); border:1.5px solid var(--amarillo); border-radius:var(--pill); padding:5px 12px; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; transition:background .15s, color .15s; }
   .xls-btn:hover { background:var(--amarillo); color:#000; }
   .xls-btn:disabled { opacity:.5; cursor:wait; }
+  /* Identificación de cliente */
+  .header-row { display:flex; align-items:center; gap:6px; }
+  .cli-btn { background:#fff; color:#000; border:none; border-radius:var(--pill); padding:6px 14px; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
+  .cli-btn:hover { background:var(--amarillo); }
+  .cli-btn.on { background:#1f9d48; color:#fff; }
+  .cond-pill { background:rgba(31,157,72,.18); color:#7ee2a0; border:1.5px solid #1f9d48; border-radius:var(--pill); padding:8px 14px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .cli-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(6px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn .2s ease; }
+  .cli-modal { max-width:420px; }
+  .cli-label { display:block; font-size:12px; font-weight:700; color:var(--tinta); margin:4px 0 6px; }
+  .cli-input { width:100%; border:1.5px solid var(--border); border-radius:var(--radius); padding:12px 14px; font-family:inherit; font-size:16px; font-weight:500; outline:none; margin-bottom:12px; background:#fafafa; }
+  .cli-input:focus { border-color:#000; background:#fff; }
+  .cli-error { color:#c62828; font-size:13px; font-weight:600; min-height:18px; margin-bottom:8px; }
+  .legal-body .cli-ayuda { font-size:12px; color:var(--text3); text-align:center; margin:12px 0 0; font-weight:400; }
+  .cli-cerrar { width:100%; padding:11px; background:none; border:1.5px solid var(--border); border-radius:var(--pill); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+  .cond-tabla { width:100%; border-collapse:collapse; margin:6px 0 14px; font-size:13px; }
+  .cond-tabla td { padding:8px 4px; border-bottom:1px solid var(--border); }
+  .cond-tabla td:last-child { text-align:right; font-weight:800; color:var(--green); }
+  .cli-salir { width:100%; padding:12px; background:#000; color:#fff; border:none; border-radius:var(--pill); font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
   .toast { position:fixed; left:50%; bottom:150px; transform:translateX(-50%); background:#000; color:#fff; border-left:4px solid var(--amarillo); padding:10px 16px; border-radius:10px; font-size:13px; font-weight:500; z-index:10001; box-shadow:0 6px 20px rgba(0,0,0,.3); animation:fadeIn .2s; }
 
   .legal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(6px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn .3s ease; }
@@ -193,7 +211,11 @@
     .header { padding:12px 12px 10px; }
     .logo-img { height:26px; }
     .subtitle { font-size:8.5px; letter-spacing:1.4px; margin-top:4px; }
-    .header-right { gap:5px; }
+    .header-top { flex-wrap:wrap; gap:10px; margin-bottom:10px; }
+    .header-right { flex-direction:row; align-items:center; justify-content:space-between; width:100%; gap:6px; }
+    .header-row { gap:6px; min-width:0; }
+    .cli-btn { max-width:150px; padding:5px 12px; font-size:10.5px; }
+    .header.compact .header-right { display:none; }
     .date-badge { font-size:10px; padding:4px 10px; }
     .xls-btn { font-size:10px; padding:4px 10px; }
     .controls { gap:8px; }
@@ -232,6 +254,24 @@
   </div>
 </div>
 
+<!-- Identificación de cliente -->
+<div class="cli-overlay hidden" id="cliOverlay" onclick="if(event.target===this)cerrarCliente()">
+  <div class="legal-modal cli-modal">
+    <div class="legal-header"><img src="logo.svg" alt=""><h2 id="cliTitulo">Ingresá como cliente</h2><p id="cliSub">Accedé a tus condiciones comerciales</p></div>
+    <form class="legal-body" id="cliForm" onsubmit="event.preventDefault(); ingresarCliente()">
+      <label class="cli-label">CUIT</label>
+      <input class="cli-input" id="cliCuit" inputmode="numeric" autocomplete="username" placeholder="20-12345678-9">
+      <label class="cli-label">Clave</label>
+      <input class="cli-input" id="cliClave" type="password" autocomplete="current-password" placeholder="La clave que te dio tu vendedor" style="text-transform:uppercase">
+      <div class="cli-error" id="cliError"></div>
+      <button class="legal-accept-btn" id="cliEntrar" type="submit">Ingresar</button>
+      <p class="cli-ayuda">¿No tenés clave? Pedísela a tu vendedor de Ámbito.</p>
+    </form>
+    <div class="legal-body hidden" id="cliInfo"></div>
+    <div class="legal-footer"><button class="cli-cerrar" onclick="cerrarCliente()">Cerrar</button></div>
+  </div>
+</div>
+
 <div class="header"><div class="header-inner">
   <div class="header-top">
     <div class="logo-wrap">
@@ -239,7 +279,10 @@
       <span class="subtitle">Lista de Precios Mayoristas</span>
     </div>
     <div class="header-right">
-      <div class="date-badge" id="dateBadge"></div>
+      <div class="header-row">
+        <button class="cli-btn" id="cliBtn" onclick="abrirCliente()">👤 Soy cliente</button>
+        <div class="date-badge" id="dateBadge"></div>
+      </div>
       <button class="xls-btn" id="xlsBtn" onclick="descargarLista()">⬇ Descargar Excel</button>
     </div>
   </div>
@@ -249,6 +292,7 @@
     <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕</button>
   </div>
   <div class="controls">
+    <button class="cond-pill hidden" id="condPill" onclick="abrirCliente()"></button>
     <span class="dto-label">Descuento:</span>
     <div class="dto-wrap">
       <button class="dto-btn" onclick="changeDto(-1)">−</button>
@@ -333,6 +377,118 @@ let shown = 0;
 let dto = 0, conIva = true, query = '';
 let ESTADOS = [];
 let fechaLista = '';
+
+// ============================================================
+// Cliente identificado y sus condiciones comerciales
+// cliente = { nombre, cuit, descuento, rubros: { 'Automotor': 15, ... } }
+// ============================================================
+let cliente = null;
+// % de descuento que corresponde a un producto
+let dtoRubro = {};   // rubro en mayúsculas -> % (para comparar sin importar mayúsculas)
+const dtoDe = p => cliente ? (dtoRubro[String(p.color).toUpperCase()] ?? cliente.descuento ?? 0) : dto;
+const conDescuento = p => base(p) * (1 - dtoDe(p) / 100);
+const hayDescuento = () => cliente ? (cliente.descuento > 0 || Object.values(cliente.rubros).some(v => v > 0)) : dto > 0;
+const etiquetaDto = () => !cliente ? `Descuento ${dto}%`
+  : Object.keys(cliente.rubros).length ? 'Bonificación según condiciones comerciales'
+  : `Bonificación ${cliente.descuento}%`;
+const cuitFmt = c => c.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3');
+
+// Misma derivación que herramientas/clientes.js
+async function derivarCliente(cuit, clave) {
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey('raw', enc.encode(`${cuit}:${clave}`), 'PBKDF2', false, ['deriveBits']);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(`ambito-lista:${cuit}`), iterations: 150000 }, base, 384));
+  const id = [...bits.slice(0, 16)].map(b => b.toString(16).padStart(2, '0')).join('');
+  return { id, raw: bits.slice(16) };
+}
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const aB64 = u => btoa(String.fromCharCode(...u));
+
+// Baja y descifra las condiciones del cliente. null = no existe (clave mal o dado de baja)
+async function leerCliente(id, raw) {
+  const r = await fetch(`clientes/${id}.json`, { cache: 'no-cache' });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error('red');
+  const f = await r.json();
+  const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+  const plano = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(f.iv) }, key, b64(f.data));
+  return JSON.parse(new TextDecoder().decode(plano));
+}
+
+// Al abrir la página: si el cliente ya había entrado, se vuelven a leer sus condiciones
+async function restaurarCliente() {
+  try {
+    const s = JSON.parse(localStorage.getItem('cliente') || 'null');
+    if (!s?.id) return;
+    const c = await leerCliente(s.id, b64(s.k));
+    if (c) aplicarCliente(c); else { localStorage.removeItem('cliente'); aplicarCliente(null); }
+  } catch (e) { /* sin conexión: queda con precios de lista */ }
+}
+
+async function ingresarCliente() {
+  const cuit = $('cliCuit').value.replace(/\D/g, ''), clave = $('cliClave').value.trim().toUpperCase();
+  const err = t => { $('cliError').textContent = t; };
+  if (cuit.length !== 11) return err('Revisá el CUIT: tiene que tener 11 números.');
+  if (!clave) return err('Ingresá tu clave.');
+  const btn = $('cliEntrar'); btn.disabled = true; btn.textContent = 'Verificando...'; err('');
+  try {
+    const { id, raw } = await derivarCliente(cuit, clave);
+    const c = await leerCliente(id, raw);
+    if (!c) throw new Error('credenciales');
+    aplicarCliente(c);
+    localStorage.setItem('cliente', JSON.stringify({ id, k: aB64(raw) }));
+    $('cliClave').value = '';
+    mostrarInfoCliente();
+    toast(`Hola ${cliente.nombre}: se aplicaron tus condiciones`);
+    setTimeout(cerrarCliente, 900);
+  } catch (e) {
+    err(e.message === 'credenciales' ? 'CUIT o clave incorrectos.' : 'No se pudo verificar. Revisá tu conexión.');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Ingresar';
+  }
+}
+
+function aplicarCliente(c) {
+  cliente = c ? { ...c, rubros: c.rubros || {} } : null;
+  dtoRubro = cliente ? Object.fromEntries(Object.entries(cliente.rubros).map(([k, v]) => [k.trim().toUpperCase(), v])) : {};
+  const btn = $('cliBtn'), pill = $('condPill');
+  btn.classList.toggle('on', !!cliente);
+  btn.textContent = cliente ? '👤 ' + cliente.nombre : '👤 Soy cliente';
+  pill.classList.toggle('hidden', !cliente);
+  pill.textContent = cliente ? '✓ ' + (Object.keys(cliente.rubros).length ? 'Tus condiciones aplicadas' : `Tu bonificación: ${cliente.descuento}%`) : '';
+  // el descuento manual se oculta mientras hay un cliente identificado
+  document.querySelector('.dto-label').classList.toggle('hidden', !!cliente);
+  document.querySelector('.dto-wrap').classList.toggle('hidden', !!cliente);
+  if (ALL.length) applyFilter();
+  if ($('cartPanel').style.display === 'flex') renderCart();
+}
+
+function salirCliente() {
+  localStorage.removeItem('cliente');
+  aplicarCliente(null);
+  cerrarCliente();
+  toast('Cerraste sesión. Se muestran los precios de lista.');
+}
+
+function mostrarInfoCliente() {
+  const logueado = !!cliente;
+  $('cliForm').classList.toggle('hidden', logueado);
+  $('cliInfo').classList.toggle('hidden', !logueado);
+  $('cliTitulo').textContent = logueado ? cliente.nombre : 'Ingresá como cliente';
+  $('cliSub').textContent = logueado ? 'CUIT ' + cuitFmt(cliente.cuit) : 'Accedé a tus condiciones comerciales';
+  if (!logueado) return;
+  const filas = [['Bonificación general', cliente.descuento], ...Object.entries(cliente.rubros)];
+  $('cliInfo').innerHTML = `<p style="margin-bottom:6px">Tus condiciones comerciales:</p>
+    <table class="cond-tabla">${filas.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}%</td></tr>`).join('')}</table>
+    <button class="cli-salir" onclick="salirCliente()">Cerrar sesión</button>`;
+}
+function abrirCliente() {
+  mostrarInfoCliente();
+  $('cliError').textContent = '';
+  $('cliOverlay').classList.remove('hidden');
+  if (!cliente) setTimeout(() => $('cliCuit').focus(), 50);
+}
+function cerrarCliente() { $('cliOverlay').classList.add('hidden'); }
 const estadosSel = new Set();   // vacío = todos
 let vendedorTel = null, vendorMode = false;
 const cart = {};
@@ -371,6 +527,7 @@ fetch(CONFIG.datos + '?r=2', { cache: 'no-cache' })
     });
     renderChips();
     restaurarCarrito();
+    restaurarCliente();
     applyFilter();
   })
   .catch(() => {
@@ -428,11 +585,11 @@ $('chips').addEventListener('click', ev => {
 });
 
 function card(p) {
-  const pb = base(p), pf = pb * (1 - dto / 100);
+  const d = dtoDe(p), pb = base(p), pf = pb * (1 - d / 100);
   const price = !p.precio
     ? `<div class="price-consultar">Consultar</div>`
-    : dto > 0
-    ? `<div class="price-original">${fmt(pb)}</div><div class="price-final">${fmt(pf)}</div><div class="dto-tag">-${dto}%</div>`
+    : d > 0
+    ? `<div class="price-original">${fmt(pb)}</div><div class="price-final">${fmt(pf)}</div><div class="dto-tag">-${d}%</div>`
     : `<div class="price-only">${fmt(pb)}</div>`;
   return `<div class="product-card has-cart${cart[p.codigo] ? ' in-cart' : ''}" data-code="${esc(p.codigo)}">
     <div class="code-col"><div class="code">${highlight(p.codigo)}</div>${p.estado ? `<div class="estado ${estadoClase(p.estado)}">${esc(titulo(p.estado))}</div>` : ''}</div>
@@ -451,7 +608,7 @@ function addCol(p) {
 function lineTotal(p) {
   const c = cart[p.codigo];
   if (!c || c.qty < 2 || !p.precio) return '';
-  return `<div class="line-total">${c.qty} u. = ${fmt(base(p) * (1 - dto / 100) * c.qty)}</div>`;
+  return `<div class="line-total">${c.qty} u. = ${fmt(conDescuento(p) * c.qty)}</div>`;
 }
 // Actualiza solo la tarjeta de ese producto (sin redibujar toda la lista)
 function refreshCard(cod) {
@@ -563,7 +720,7 @@ function changeQty(cod, d) { if (cart[cod]) listQty(cod, d); }
 // Calcula el presupuesto con el descuento y el IVA elegidos en pantalla
 function calcularPresupuesto() {
   const items = Object.values(cart).map(({ p, qty }) => {
-    const lista = base(p), unit = lista * (1 - dto / 100);
+    const lista = base(p), unit = conDescuento(p);
     return { p, qty, lista, unit, sub: unit * qty, subLista: lista * qty };
   });
   const totalLista = items.reduce((s, i) => s + i.subLista, 0);
@@ -588,7 +745,7 @@ function renderCart() {
       <div><div class="cart-item-price">${p.precio ? fmt(sub) : 'Consultar'}</div>${p.precio && qty > 1 ? `<div class="cart-item-unit">${fmt(unit)} c/u</div>` : ''}</div></div>`;
   }).join('');
   $('cartTotalItems').textContent = b.n + ' producto' + (b.n !== 1 ? 's' : '') + ' en el presupuesto';
-  $('cartDtoLine').innerHTML = dto > 0 ? `<span>Descuento ${dto}% aplicado</span><span>−${fmt(b.totalLista - b.total)}</span>` : '';
+  $('cartDtoLine').innerHTML = b.totalLista - b.total > 0.5 ? `<span>${etiquetaDto()}</span><span>−${fmt(b.totalLista - b.total)}</span>` : '';
   $('cartTotalLabel').textContent = 'Total ' + (conIva ? 'c/IVA' : 's/IVA');
   $('cartTotalValue').textContent = fmt(b.total);
 }
@@ -598,8 +755,10 @@ function textoPresupuesto() {
   const hoy = new Date().toLocaleDateString('es-AR');
   const lines = b.items.map(({ p, qty, unit, sub }) =>
     `• ${qty} x ${p.nombre} [${p.codigo}]\n   ${p.precio ? (qty > 1 ? fmt(unit) + ' c/u = ' : '') + fmt(sub) : 'Precio a consultar'}`);
-  let msg = `*Presupuesto — ${CONFIG.empresa}*\n${hoy}\n\n${lines.join('\n')}\n\n`;
-  if (dto > 0) msg += `Subtotal lista: ${fmt(b.totalLista)}\nDescuento ${dto}%: −${fmt(b.totalLista - b.total)}\n`;
+  let msg = `*Presupuesto — ${CONFIG.empresa}*\n${hoy}\n`;
+  if (cliente) msg += `Cliente: ${cliente.nombre} (CUIT ${cuitFmt(cliente.cuit)})\n`;
+  msg += `\n${lines.join('\n')}\n\n`;
+  if (b.totalLista - b.total > 0.5) msg += `Subtotal lista: ${fmt(b.totalLista)}\n${etiquetaDto()}: −${fmt(b.totalLista - b.total)}\n`;
   msg += `*TOTAL: ${fmt(b.total)}* ${conIva ? 'c/IVA' : 's/IVA'}`;
   if (b.sinPrecio) msg += `\n(Hay productos con precio a consultar)`;
   msg += `\n\n_Presupuesto orientativo. Precios sujetos a confirmación y stock._`;
@@ -663,10 +822,18 @@ async function generarPDF() {
   if (fechaLista) doc.text('Lista de precios al ' + fechaLista, W - 14, 25.5, { align: 'right' });
 
   doc.setTextColor(63, 63, 63); doc.setFontSize(9);
-  doc.text(`Precios en pesos ${iva}${dto > 0 ? ` — descuento ${dto}% aplicado` : ''}`, 14, 39);
+  let y0 = 39;
+  if (cliente) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+    doc.text(`Cliente: ${cliente.nombre}`, 14, y0);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(63, 63, 63);
+    doc.text(`CUIT ${cuitFmt(cliente.cuit)}`, W - 14, y0, { align: 'right' });
+    y0 += 6;
+  }
+  doc.text(`Precios en pesos ${iva}${hayDescuento() ? ` — ${etiquetaDto().toLowerCase()} aplicada` : ''}`, 14, y0);
 
   doc.autoTable({
-    startY: 43,
+    startY: y0 + 4,
     head: [['Código', 'Detalle', 'Cant.', `P. unitario`, `Subtotal`]],
     body: b.items.map(i => [i.p.codigo, i.p.nombre, i.qty, i.p.precio ? $$(i.unit) : 'Consultar', i.p.precio ? $$(i.sub) : 'Consultar']),
     theme: 'grid',
@@ -681,10 +848,10 @@ async function generarPDF() {
   let y = doc.lastAutoTable.finalY + 6;
   if (y > H - 40) { doc.addPage(); y = 20; }
   doc.setFontSize(9.5); doc.setTextColor(63, 63, 63); doc.setFont('helvetica', 'normal');
-  if (dto > 0) {
+  if (b.totalLista - b.total > 0.5) {
     doc.text('Subtotal lista', W - 50, y, { align: 'right' }); doc.text($$(b.totalLista), W - 14, y, { align: 'right' }); y += 5.5;
     doc.setTextColor(31, 157, 72);
-    doc.text(`Descuento ${dto}%`, W - 50, y, { align: 'right' }); doc.text('- ' + $$(b.totalLista - b.total), W - 14, y, { align: 'right' }); y += 4;
+    doc.text(cliente && Object.keys(cliente.rubros).length ? 'Bonificación' : etiquetaDto(), W - 50, y, { align: 'right' }); doc.text('- ' + $$(b.totalLista - b.total), W - 14, y, { align: 'right' }); y += 4;
   }
   doc.setFillColor(255, 209, 0); doc.roundedRect(W - 90, y, 76, 11, 2, 2, 'F');
   doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
@@ -786,10 +953,10 @@ async function descargarLista() {
     const X = await cargarXLSX();
     const iva = conIva ? 'c/IVA' : 's/IVA';
     const cab = ['Código', 'Detalle', 'Rubro', 'Estado', `Precio lista ${iva}`];
-    if (dto > 0) cab.push(`Descuento %`, `Precio final ${iva}`);
+    if (hayDescuento()) cab.push(`Descuento %`, `Precio final ${iva}`);
     const filas = filtered.map(p => {
       const f = [p.codigo, p.nombre, p.color, titulo(p.estado), r2(base(p))];
-      if (dto > 0) f.push(dto, r2(base(p) * (1 - dto / 100)));
+      if (hayDescuento()) f.push(dtoDe(p), r2(conDescuento(p)));
       return f;
     });
     const ws = X.utils.aoa_to_sheet([cab, ...filas]);
@@ -813,13 +980,14 @@ async function descargarPresupuesto() {
     const iva = conIva ? 'c/IVA' : 's/IVA';
     const filas = [
       [`Presupuesto — ${CONFIG.empresa}`],
-      [`Fecha: ${new Date().toLocaleDateString('es-AR')}`, '', '', `Precios ${iva}`, dto > 0 ? `Descuento ${dto}%` : ''],
+      [`Fecha: ${new Date().toLocaleDateString('es-AR')}`, '', '', `Precios ${iva}`, hayDescuento() ? etiquetaDto() : ''],
+      cliente ? [`Cliente: ${cliente.nombre}`, `CUIT ${cuitFmt(cliente.cuit)}`] : [],
       [],
       ['Código', 'Detalle', 'Cantidad', `Precio unitario ${iva}`, `Subtotal ${iva}`],
       ...b.items.map(i => [i.p.codigo, i.p.nombre, i.qty, i.p.precio ? r2(i.unit) : 'Consultar', i.p.precio ? r2(i.sub) : 'Consultar']),
       [],
     ];
-    if (dto > 0) filas.push(['', '', '', 'Subtotal lista', r2(b.totalLista)], ['', '', '', `Descuento ${dto}%`, -r2(b.totalLista - b.total)]);
+    if (b.totalLista - b.total > 0.5) filas.push(['', '', '', 'Subtotal lista', r2(b.totalLista)], ['', '', '', etiquetaDto(), -r2(b.totalLista - b.total)]);
     filas.push(['', '', '', 'TOTAL', r2(b.total)], [], ['Presupuesto orientativo. Precios sujetos a confirmación y disponibilidad de stock.']);
     const ws = X.utils.aoa_to_sheet(filas);
     ws['!cols'] = [{ wch: 10 }, { wch: 55 }, { wch: 10 }, { wch: 22 }, { wch: 18 }];
