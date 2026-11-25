@@ -246,9 +246,10 @@
     <div class="cart-dto-line" id="cartDtoLine"></div>
     <div class="cart-total"><span class="cart-total-label" id="cartTotalLabel">Total</span><span class="cart-total-value" id="cartTotalValue">$0</span></div>
     <div class="cart-disclaimer">Presupuesto orientativo. Precios sujetos a confirmación y disponibilidad de stock.</div>
-    <button class="cart-send-btn" onclick="compartirWhatsApp()"><svg viewBox="0 0 24 24" id="waIcon2"></svg>Compartir por WhatsApp</button>
+    <button class="cart-send-btn" id="shareBtn" onclick="compartirPDF()"><svg viewBox="0 0 24 24" id="waIcon2"></svg>Compartir PDF por WhatsApp</button>
     <div class="cart-actions">
-      <button class="cart-sec-btn" onclick="descargarPresupuesto()">⬇ Descargar Excel</button>
+      <button class="cart-sec-btn" onclick="descargarPDF()">⬇ PDF</button>
+      <button class="cart-sec-btn" onclick="descargarPresupuesto()">⬇ Excel</button>
       <button class="cart-sec-btn hidden" id="sendVendBtn" onclick="enviarAlVendedor()">Enviar al vendedor</button>
     </div>
   </div>
@@ -491,10 +492,10 @@ function restaurarCarrito() {
   updateBadge();
 }
 const updateBadge = () => { $('cartBadge').textContent = Object.values(cart).reduce((s, c) => s + c.qty, 0); guardarCarrito(); };
-function openCart() { renderCart(); $('cartOverlay').style.display = 'block'; $('cartPanel').style.display = 'flex'; document.querySelector('.fab-group').style.visibility = 'hidden'; document.body.style.overflow = 'hidden'; }
+function openCart() { renderCart(); pendiente = null; cargarPDF().catch(() => {}); logoComoPNG(); $('cartOverlay').style.display = 'block'; $('cartPanel').style.display = 'flex'; document.querySelector('.fab-group').style.visibility = 'hidden'; document.body.style.overflow = 'hidden'; }
 function closeCart() { $('cartOverlay').style.display = 'none'; $('cartPanel').style.display = 'none'; document.querySelector('.fab-group').style.visibility = ''; document.body.style.overflow = ''; }
 function clearCart() { for (const k in cart) delete cart[k]; updateBadge(); renderCart(); }
-function changeQty(cod, d) { if (!cart[cod]) return; cart[cod].qty += d; if (cart[cod].qty <= 0) delete cart[cod]; updateBadge(); renderCart(); }
+function changeQty(cod, d) { if (!cart[cod]) return; if (pendiente) { pendiente = null; setShareLabel(SHARE_LABEL); } cart[cod].qty += d; if (cart[cod].qty <= 0) delete cart[cod]; updateBadge(); renderCart(); }
 
 // Calcula el presupuesto con el descuento y el IVA elegidos en pantalla
 function calcularPresupuesto() {
@@ -542,10 +543,150 @@ function textoPresupuesto() {
   return msg;
 }
 
-// Abre WhatsApp para que el cliente elija a qué contacto mandarlo
-function compartirWhatsApp() {
+// ============================================================
+// PDF del presupuesto (jsPDF se carga recién al usarlo)
+// ============================================================
+function cargarScript(src) {
+  return new Promise((ok, mal) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = ok; s.onerror = mal;
+    document.head.appendChild(s);
+  });
+}
+let pdfLib = null;
+function cargarPDF() {
+  if (!pdfLib) pdfLib = cargarScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js')
+    .then(() => cargarScript('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js'))
+    .then(() => window.jspdf.jsPDF)
+    .catch(e => { pdfLib = null; throw e; });
+  return pdfLib;
+}
+// El logo es SVG: lo pasamos a PNG para poder meterlo en el PDF
+let logoPNG = null;
+function logoComoPNG() {
+  if (logoPNG) return logoPNG;
+  logoPNG = new Promise(ok => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = 332 * 3; c.height = 48 * 3;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, c.width, c.height);   // fondo negro como el encabezado
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      ok(c.toDataURL('image/jpeg', 0.9));
+    };
+    img.onerror = () => ok(null);
+    img.src = CONFIG.logo;
+  });
+  return logoPNG;
+}
+const nombrePDF = () => `Presupuesto Ambito ${fechaArchivo()}.pdf`;
+
+async function generarPDF() {
+  const b = calcularPresupuesto();
+  const [jsPDF, logo] = await Promise.all([cargarPDF(), logoComoPNG()]);
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const iva = conIva ? 'c/IVA' : 's/IVA';
+  const $$ = n => '$ ' + Math.round(n).toLocaleString('es-AR');
+
+  // Encabezado negro con logo y línea amarilla
+  doc.setFillColor(0, 0, 0); doc.rect(0, 0, W, 30, 'F');
+  doc.setFillColor(255, 209, 0); doc.rect(0, 30, W, 1.6, 'F');
+  if (logo) doc.addImage(logo, 'JPEG', 14, 9, 83, 12); else { doc.setTextColor(255, 209, 0); doc.setFontSize(18); doc.text(CONFIG.empresa, 14, 18); }
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+  doc.text('PRESUPUESTO', W - 14, 15, { align: 'right' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(200, 200, 200);
+  doc.text('Fecha: ' + new Date().toLocaleDateString('es-AR'), W - 14, 21, { align: 'right' });
+  if (fechaLista) doc.text('Lista de precios al ' + fechaLista, W - 14, 25.5, { align: 'right' });
+
+  doc.setTextColor(63, 63, 63); doc.setFontSize(9);
+  doc.text(`Precios en pesos ${iva}${dto > 0 ? ` — descuento ${dto}% aplicado` : ''}`, 14, 39);
+
+  doc.autoTable({
+    startY: 43,
+    head: [['Código', 'Detalle', 'Cant.', `P. unitario`, `Subtotal`]],
+    body: b.items.map(i => [i.p.codigo, i.p.nombre, i.qty, i.p.precio ? $$(i.unit) : 'Consultar', i.p.precio ? $$(i.sub) : 'Consultar']),
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2.2, textColor: [17, 17, 17], lineColor: [226, 226, 226], lineWidth: .2 },
+    headStyles: { fillColor: [0, 0, 0], textColor: [255, 209, 0], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [248, 248, 248] },
+    columnStyles: { 0: { cellWidth: 20 }, 2: { cellWidth: 14, halign: 'center' }, 3: { cellWidth: 28, halign: 'right' }, 4: { cellWidth: 30, halign: 'right', fontStyle: 'bold' } },
+    margin: { left: 14, right: 14 },
+  });
+
+  // Totales
+  let y = doc.lastAutoTable.finalY + 6;
+  if (y > H - 40) { doc.addPage(); y = 20; }
+  doc.setFontSize(9.5); doc.setTextColor(63, 63, 63); doc.setFont('helvetica', 'normal');
+  if (dto > 0) {
+    doc.text('Subtotal lista', W - 50, y, { align: 'right' }); doc.text($$(b.totalLista), W - 14, y, { align: 'right' }); y += 5.5;
+    doc.setTextColor(31, 157, 72);
+    doc.text(`Descuento ${dto}%`, W - 50, y, { align: 'right' }); doc.text('- ' + $$(b.totalLista - b.total), W - 14, y, { align: 'right' }); y += 4;
+  }
+  doc.setFillColor(255, 209, 0); doc.roundedRect(W - 90, y, 76, 11, 2, 2, 'F');
+  doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+  doc.text(`TOTAL ${iva}`, W - 86, y + 7.3); doc.text($$(b.total), W - 17, y + 7.3, { align: 'right' });
+  if (b.sinPrecio) { doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120); doc.text('Hay productos con precio a consultar.', W - 14, y + 16, { align: 'right' }); }
+
+  // Pie en todas las páginas
+  const pags = doc.getNumberOfPages();
+  for (let i = 1; i <= pags; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(255, 209, 0); doc.setLineWidth(.6); doc.line(14, H - 16, W - 14, H - 16);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(120);
+    doc.text('Presupuesto orientativo, no constituye oferta vinculante. Precios sujetos a confirmación y disponibilidad de stock.', 14, H - 11);
+    doc.text(`${CONFIG.empresa} · ${location.host}`, 14, H - 7);
+    doc.text(`Página ${i} de ${pags}`, W - 14, H - 7, { align: 'right' });
+  }
+  return doc;
+}
+
+async function descargarPDF() {
   if (!Object.keys(cart).length) return;
-  open('https://wa.me/?text=' + encodeURIComponent(textoPresupuesto()), '_blank');
+  try { (await generarPDF()).save(nombrePDF()); }
+  catch (e) { toast('No se pudo generar el PDF. Revisá tu conexión.'); }
+}
+
+// Comparte el PDF: en el celular abre el menú "Compartir" (elegís WhatsApp y el contacto).
+// Si el navegador no puede compartir archivos, lo descarga y abre WhatsApp para adjuntarlo.
+const SHARE_LABEL = 'Compartir PDF por WhatsApp';
+let pendiente = null;   // PDF ya generado, esperando un segundo toque (iPhone)
+const setShareLabel = t => { $('shareBtn').lastChild.textContent = t; };
+
+async function compartirPDF() {
+  if (!Object.keys(cart).length) return;
+  // Segundo toque: el PDF ya está listo, se comparte en el acto
+  if (pendiente) {
+    const p = pendiente; pendiente = null; setShareLabel(SHARE_LABEL);
+    try { await navigator.share(p); } catch (e) {}
+    return;
+  }
+  const btn = $('shareBtn');
+  btn.disabled = true; setShareLabel('Generando PDF...');
+  try {
+    const doc = await generarPDF();
+    const file = new File([doc.output('blob')], nombrePDF(), { type: 'application/pdf' });
+    const b = calcularPresupuesto();
+    const texto = `Presupuesto ${CONFIG.empresa} — Total ${fmt(b.total)} ${conIva ? 'c/IVA' : 's/IVA'}`;
+    const data = { files: [file], title: nombrePDF(), text: texto };
+    setShareLabel(SHARE_LABEL);
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share(data); }
+      catch (e) {
+        if (e.name === 'NotAllowedError') { pendiente = data; setShareLabel('PDF listo — tocá para compartir'); }
+        else if (e.name !== 'AbortError') throw e;
+      }
+    } else {
+      doc.save(nombrePDF());
+      toast('PDF descargado. Adjuntalo en el chat de WhatsApp 📎');
+      setTimeout(() => open('https://wa.me/?text=' + encodeURIComponent(texto + ' (te adjunto el PDF)'), '_blank'), 800);
+    }
+  } catch (e) {
+    setShareLabel(SHARE_LABEL);
+    toast('No se pudo generar el PDF. Revisá tu conexión.');
+  } finally {
+    btn.disabled = false;
+  }
 }
 function enviarAlVendedor() {
   if (!vendedorTel || !Object.keys(cart).length) return;
