@@ -149,6 +149,18 @@
   .cart-total-value { font-size:20px; font-weight:800; }
   .cart-disclaimer { font-size:10px; color:var(--text3); font-weight:600; text-align:center; margin-bottom:10px; line-height:1.4; }
   .cart-send-btn { width:100%; padding:14px; background:#25D366; color:#fff; border:none; border-radius:var(--pill); font-family:inherit; font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .cart-actions { display:flex; gap:8px; margin-top:8px; }
+  .cart-sec-btn { flex:1; padding:11px 10px; background:#fff; color:#000; border:1.5px solid #000; border-radius:var(--pill); font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .cart-sec-btn:hover { background:var(--amarillo); border-color:var(--amarillo); }
+  .cart-dto-line { display:flex; justify-content:space-between; font-size:12px; color:var(--green); font-weight:700; margin-bottom:4px; }
+  .cart-item-unit { font-size:11px; color:var(--text3); font-weight:500; text-align:right; }
+
+  /* Header: fecha + descarga */
+  .header-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .xls-btn { background:transparent; color:var(--amarillo); border:1.5px solid var(--amarillo); border-radius:var(--pill); padding:5px 12px; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; transition:background .15s, color .15s; }
+  .xls-btn:hover { background:var(--amarillo); color:#000; }
+  .xls-btn:disabled { opacity:.5; cursor:wait; }
+  .toast { position:fixed; left:50%; bottom:90px; transform:translateX(-50%); background:#000; color:#fff; border-left:4px solid var(--amarillo); padding:10px 16px; border-radius:10px; font-size:13px; font-weight:500; z-index:10001; box-shadow:0 6px 20px rgba(0,0,0,.3); animation:fadeIn .2s; }
 
   .legal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(6px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn .3s ease; }
   .legal-modal { background:#fff; border-radius:16px; max-width:520px; width:100%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.25); animation:slideUp .4s ease; overflow:hidden; }
@@ -189,7 +201,10 @@
       <div id="logo"></div>
       <span class="subtitle">Lista de Precios Mayoristas</span>
     </div>
-    <div class="date-badge" id="dateBadge"></div>
+    <div class="header-right">
+      <div class="date-badge" id="dateBadge"></div>
+      <button class="xls-btn" id="xlsBtn" onclick="descargarLista()">⬇ Descargar Excel</button>
+    </div>
   </div>
   <div class="search-wrap">
     <span class="search-icon">🔍</span>
@@ -219,7 +234,7 @@
 <div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
 <div class="cart-panel" id="cartPanel">
   <div class="cart-header">
-    <h3>🛒 Mi Pedido</h3>
+    <h3>🧾 Mi Presupuesto</h3>
     <div class="cart-header-actions">
       <button class="cart-clear" onclick="clearCart()">Vaciar</button>
       <button class="cart-close" onclick="closeCart()">✕</button>
@@ -228,15 +243,20 @@
   <div class="cart-body" id="cartBody"></div>
   <div class="cart-footer" id="cartFooter">
     <div class="cart-total-items" id="cartTotalItems"></div>
-    <div class="cart-total"><span class="cart-total-label">Total lista</span><span class="cart-total-value" id="cartTotalValue">$0</span></div>
-    <div class="cart-disclaimer">Los precios enviados son de lista. El vendedor aplicará el descuento correspondiente.</div>
-    <button class="cart-send-btn" onclick="sendCartWhatsApp()"><svg viewBox="0 0 24 24" id="waIcon2"></svg>Enviar pedido por WhatsApp</button>
+    <div class="cart-dto-line" id="cartDtoLine"></div>
+    <div class="cart-total"><span class="cart-total-label" id="cartTotalLabel">Total</span><span class="cart-total-value" id="cartTotalValue">$0</span></div>
+    <div class="cart-disclaimer">Presupuesto orientativo. Precios sujetos a confirmación y disponibilidad de stock.</div>
+    <button class="cart-send-btn" onclick="compartirWhatsApp()"><svg viewBox="0 0 24 24" id="waIcon2"></svg>Compartir por WhatsApp</button>
+    <div class="cart-actions">
+      <button class="cart-sec-btn" onclick="descargarPresupuesto()">⬇ Descargar Excel</button>
+      <button class="cart-sec-btn hidden" id="sendVendBtn" onclick="enviarAlVendedor()">Enviar al vendedor</button>
+    </div>
   </div>
 </div>
 
 <div class="fab-group">
   <button class="fab-wa" id="fabWa" onclick="openWhatsApp()" aria-label="WhatsApp"><svg viewBox="0 0 24 24" id="waIcon1"></svg></button>
-  <button class="fab-cart" id="fabCart" onclick="openCart()" aria-label="Pedido">🛒<span class="cart-badge" id="cartBadge">0</span></button>
+  <button class="fab-cart" id="fabCart" onclick="openCart()" aria-label="Presupuesto" style="display:flex">🧾<span class="cart-badge" id="cartBadge">0</span></button>
   <button class="fab" id="fab" onclick="scrollTo({top:0,behavior:'smooth'})" aria-label="Arriba">↑</button>
 </div>
 
@@ -274,6 +294,7 @@ let filtered = [];
 let shown = 0;
 let dto = 0, conIva = true, query = '';
 let ESTADOS = [];
+let fechaLista = '';
 const estadosSel = new Set();   // vacío = todos
 let vendedorTel = null, vendorMode = false;
 const cart = {};
@@ -300,6 +321,7 @@ document.title = CONFIG.empresa + ' — Lista de Precios Mayoristas';
 fetch(CONFIG.datos + '?r=2', { cache: 'no-cache' })
   .then(r => r.ok ? r.json() : Promise.reject())
   .then(data => {
+    fechaLista = data.fecha || '';
     if (data.fecha) $('dateBadge').textContent = 'Lista al ' + data.fecha; else $('dateBadge').remove();
     ESTADOS = data.estados;
     const factor = CONFIG.preciosConIva ? 1 : CONFIG.iva;
@@ -310,6 +332,7 @@ fetch(CONFIG.datos + '?r=2', { cache: 'no-cache' })
       return p;
     });
     renderChips();
+    restaurarCarrito();
     applyFilter();
   })
   .catch(() => {
@@ -373,8 +396,8 @@ function card(p) {
     : dto > 0
     ? `<div class="price-original">${fmt(pb)}</div><div class="price-final">${fmt(pf)}</div><div class="dto-tag">-${dto}%</div>`
     : `<div class="price-only">${fmt(pb)}</div>`;
-  const add = vendorMode ? `<div class="add-col"><button class="add-btn" data-code="${esc(p.codigo)}" onclick="addToCart(this)">+</button></div>` : '';
-  return `<div class="product-card${vendorMode ? ' has-cart' : ''}">
+  const add = `<div class="add-col"><button class="add-btn" data-code="${esc(p.codigo)}" onclick="addToCart(this)" aria-label="Agregar al presupuesto">+</button></div>`;
+  return `<div class="product-card has-cart">
     <div class="code-col"><div class="code">${highlight(p.codigo)}</div>${p.estado ? `<div class="estado ${estadoClase(p.estado)}">${esc(titulo(p.estado))}</div>` : ''}</div>
     <div class="info-col"><div class="product-name">${highlight(p.nombre)}</div>${p.color ? `<div class="product-color">${highlight(p.color)}</div>` : ''}</div>
     <div class="price-col">${price}</div>${add}
@@ -431,7 +454,7 @@ addEventListener('scroll', () => {
       if (cod.toUpperCase() !== id) continue;
       vendedorTel = tel.replace(/\D/g, '');
       $('fabWa').style.display = 'flex';
-      if (cartMode) { vendorMode = true; $('fabCart').style.display = 'flex'; if (ALL.length) applyFilter(); }
+      $('sendVendBtn').classList.remove('hidden');
       break;
     }
   }).catch(() => {});
@@ -453,44 +476,155 @@ function addToCart(btn) {
   btn.classList.add('ok'); btn.textContent = '✓';
   setTimeout(() => { btn.classList.remove('ok'); btn.textContent = '+'; }, 400);
 }
-const updateBadge = () => $('cartBadge').textContent = Object.values(cart).reduce((s, c) => s + c.qty, 0);
+// El presupuesto se guarda en el navegador del cliente (sobrevive a cerrar la página)
+function guardarCarrito() {
+  try { localStorage.setItem('presupuesto', JSON.stringify(Object.values(cart).map(c => [c.p.codigo, c.qty]))); } catch (e) {}
+}
+function restaurarCarrito() {
+  try {
+    const idx = new Map(ALL.map(p => [p.codigo, p]));
+    for (const [cod, qty] of JSON.parse(localStorage.getItem('presupuesto') || '[]')) {
+      const p = idx.get(cod);
+      if (p && qty > 0) cart[cod] = { p, qty };
+    }
+  } catch (e) {}
+  updateBadge();
+}
+const updateBadge = () => { $('cartBadge').textContent = Object.values(cart).reduce((s, c) => s + c.qty, 0); guardarCarrito(); };
 function openCart() { renderCart(); $('cartOverlay').style.display = 'block'; $('cartPanel').style.display = 'flex'; document.querySelector('.fab-group').style.visibility = 'hidden'; document.body.style.overflow = 'hidden'; }
 function closeCart() { $('cartOverlay').style.display = 'none'; $('cartPanel').style.display = 'none'; document.querySelector('.fab-group').style.visibility = ''; document.body.style.overflow = ''; }
 function clearCart() { for (const k in cart) delete cart[k]; updateBadge(); renderCart(); }
 function changeQty(cod, d) { if (!cart[cod]) return; cart[cod].qty += d; if (cart[cod].qty <= 0) delete cart[cod]; updateBadge(); renderCart(); }
 
+// Calcula el presupuesto con el descuento y el IVA elegidos en pantalla
+function calcularPresupuesto() {
+  const items = Object.values(cart).map(({ p, qty }) => {
+    const lista = base(p), unit = lista * (1 - dto / 100);
+    return { p, qty, lista, unit, sub: unit * qty, subLista: lista * qty };
+  });
+  const totalLista = items.reduce((s, i) => s + i.subLista, 0);
+  const total = items.reduce((s, i) => s + i.sub, 0);
+  const n = items.reduce((s, i) => s + i.qty, 0);
+  return { items, totalLista, total, n, sinPrecio: items.some(i => !i.p.precio) };
+}
+
 function renderCart() {
-  const items = Object.values(cart);
-  if (!items.length) {
-    $('cartBody').innerHTML = '<div class="cart-empty">El pedido está vacío.<br>Agregá productos con el botón <b>+</b></div>';
+  const b = calcularPresupuesto();
+  if (!b.items.length) {
+    $('cartBody').innerHTML = '<div class="cart-empty">El presupuesto está vacío.<br>Agregá productos con el botón <b>+</b></div>';
     $('cartFooter').style.display = 'none';
     return;
   }
   $('cartFooter').style.display = 'block';
-  let total = 0, n = 0;
-  $('cartBody').innerHTML = items.map(({ p, qty }) => {
-    const sub = base(p) * qty; total += sub; n += qty;
-    const det = [p.codigo, p.color, fmtMedida(p.canmed, p.med)].filter(Boolean).join(' · ');
+  $('cartBody').innerHTML = b.items.map(({ p, qty, unit, sub }) => {
+    const det = [p.codigo, p.color].filter(Boolean).join(' · ');
     return `<div class="cart-item">
       <div class="cart-item-info"><div class="cart-item-name">${esc(p.nombre)}</div><div class="cart-item-detail">${esc(det)}</div></div>
       <div class="cart-item-qty"><button class="cart-qty-btn" onclick="changeQty('${esc(p.codigo)}',-1)">−</button><span class="cart-qty-val">${qty}</span><button class="cart-qty-btn" onclick="changeQty('${esc(p.codigo)}',1)">+</button></div>
-      <div class="cart-item-price">${fmt(sub)}</div></div>`;
+      <div><div class="cart-item-price">${p.precio ? fmt(sub) : 'Consultar'}</div>${p.precio && qty > 1 ? `<div class="cart-item-unit">${fmt(unit)} c/u</div>` : ''}</div></div>`;
   }).join('');
-  $('cartTotalItems').textContent = n + ' producto' + (n !== 1 ? 's' : '') + ' en el pedido';
-  $('cartTotalValue').textContent = fmt(total);
+  $('cartTotalItems').textContent = b.n + ' producto' + (b.n !== 1 ? 's' : '') + ' en el presupuesto';
+  $('cartDtoLine').innerHTML = dto > 0 ? `<span>Descuento ${dto}% aplicado</span><span>−${fmt(b.totalLista - b.total)}</span>` : '';
+  $('cartTotalLabel').textContent = 'Total ' + (conIva ? 'c/IVA' : 's/IVA');
+  $('cartTotalValue').textContent = fmt(b.total);
 }
 
-function sendCartWhatsApp() {
-  const items = Object.values(cart);
-  if (!vendedorTel || !items.length) return;
-  let total = 0;
-  const lines = items.map(({ p, qty }) => {
-    const sub = base(p) * qty; total += sub;
-    const m = fmtMedida(p.canmed, p.med);
-    return `• ${qty}x [${p.codigo}] ${p.nombre}${p.color ? ' (' + p.color + ')' : ''}${m ? ' ' + m : ''} — ${fmt(sub)}`;
+function textoPresupuesto() {
+  const b = calcularPresupuesto();
+  const hoy = new Date().toLocaleDateString('es-AR');
+  const lines = b.items.map(({ p, qty, unit, sub }) =>
+    `• ${qty} x ${p.nombre} [${p.codigo}]\n   ${p.precio ? (qty > 1 ? fmt(unit) + ' c/u = ' : '') + fmt(sub) : 'Precio a consultar'}`);
+  let msg = `*Presupuesto — ${CONFIG.empresa}*\n${hoy}\n\n${lines.join('\n')}\n\n`;
+  if (dto > 0) msg += `Subtotal lista: ${fmt(b.totalLista)}\nDescuento ${dto}%: −${fmt(b.totalLista - b.total)}\n`;
+  msg += `*TOTAL: ${fmt(b.total)}* ${conIva ? 'c/IVA' : 's/IVA'}`;
+  if (b.sinPrecio) msg += `\n(Hay productos con precio a consultar)`;
+  msg += `\n\n_Presupuesto orientativo. Precios sujetos a confirmación y stock._`;
+  return msg;
+}
+
+// Abre WhatsApp para que el cliente elija a qué contacto mandarlo
+function compartirWhatsApp() {
+  if (!Object.keys(cart).length) return;
+  open('https://wa.me/?text=' + encodeURIComponent(textoPresupuesto()), '_blank');
+}
+function enviarAlVendedor() {
+  if (!vendedorTel || !Object.keys(cart).length) return;
+  open('https://wa.me/' + vendedorTel + '?text=' + encodeURIComponent(textoPresupuesto()), '_blank');
+}
+
+// ============================================================
+// Descargas en Excel (la librería se carga recién al tocar el botón)
+// ============================================================
+let xlsxLib = null;
+function cargarXLSX() {
+  if (xlsxLib) return xlsxLib;
+  xlsxLib = new Promise((ok, mal) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    s.onload = () => ok(window.XLSX);
+    s.onerror = () => { xlsxLib = null; mal(); };
+    document.head.appendChild(s);
   });
-  const msg = `*Pedido desde Lista ${CONFIG.empresa}*\n\n${lines.join('\n')}\n\n*Total lista: ${fmt(total)}* ${conIva ? 'c/IVA' : 's/IVA'}\n_Precios de lista. El vendedor aplicará el descuento correspondiente._`;
-  open('https://wa.me/' + vendedorTel + '?text=' + encodeURIComponent(msg), '_blank');
+  return xlsxLib;
+}
+function toast(t) {
+  const d = document.createElement('div'); d.className = 'toast'; d.textContent = t;
+  document.body.appendChild(d); setTimeout(() => d.remove(), 2500);
+}
+const r2 = n => Math.round(n * 100) / 100;
+const fechaArchivo = () => new Date().toLocaleDateString('es-AR').replace(/\//g, '-');
+
+async function descargarLista() {
+  const btn = $('xlsBtn');
+  if (!filtered.length) return toast('No hay productos para descargar');
+  btn.disabled = true; btn.textContent = 'Generando...';
+  try {
+    const X = await cargarXLSX();
+    const iva = conIva ? 'c/IVA' : 's/IVA';
+    const cab = ['Código', 'Detalle', 'Rubro', 'Estado', `Precio lista ${iva}`];
+    if (dto > 0) cab.push(`Descuento %`, `Precio final ${iva}`);
+    const filas = filtered.map(p => {
+      const f = [p.codigo, p.nombre, p.color, titulo(p.estado), r2(base(p))];
+      if (dto > 0) f.push(dto, r2(base(p) * (1 - dto / 100)));
+      return f;
+    });
+    const ws = X.utils.aoa_to_sheet([cab, ...filas]);
+    ws['!cols'] = [{ wch: 10 }, { wch: 55 }, { wch: 28 }, { wch: 12 }, { wch: 16 }, { wch: 11 }, { wch: 16 }];
+    ws['!autofilter'] = { ref: ws['!ref'] };
+    const wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, ws, 'Lista de precios');
+    X.writeFile(wb, `Lista Ambito ${fechaLista.replace(/\//g, '-') || fechaArchivo()}.xlsx`);
+  } catch (e) {
+    toast('No se pudo generar el Excel. Revisá tu conexión.');
+  } finally {
+    btn.disabled = false; btn.textContent = '⬇ Descargar Excel';
+  }
+}
+
+async function descargarPresupuesto() {
+  const b = calcularPresupuesto();
+  if (!b.items.length) return;
+  try {
+    const X = await cargarXLSX();
+    const iva = conIva ? 'c/IVA' : 's/IVA';
+    const filas = [
+      [`Presupuesto — ${CONFIG.empresa}`],
+      [`Fecha: ${new Date().toLocaleDateString('es-AR')}`, '', '', `Precios ${iva}`, dto > 0 ? `Descuento ${dto}%` : ''],
+      [],
+      ['Código', 'Detalle', 'Cantidad', `Precio unitario ${iva}`, `Subtotal ${iva}`],
+      ...b.items.map(i => [i.p.codigo, i.p.nombre, i.qty, i.p.precio ? r2(i.unit) : 'Consultar', i.p.precio ? r2(i.sub) : 'Consultar']),
+      [],
+    ];
+    if (dto > 0) filas.push(['', '', '', 'Subtotal lista', r2(b.totalLista)], ['', '', '', `Descuento ${dto}%`, -r2(b.totalLista - b.total)]);
+    filas.push(['', '', '', 'TOTAL', r2(b.total)], [], ['Presupuesto orientativo. Precios sujetos a confirmación y disponibilidad de stock.']);
+    const ws = X.utils.aoa_to_sheet(filas);
+    ws['!cols'] = [{ wch: 10 }, { wch: 55 }, { wch: 10 }, { wch: 22 }, { wch: 18 }];
+    const wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, ws, 'Presupuesto');
+    X.writeFile(wb, `Presupuesto Ambito ${fechaArchivo()}.xlsx`);
+  } catch (e) {
+    toast('No se pudo generar el Excel. Revisá tu conexión.');
+  }
 }
 
 // ============================================================
