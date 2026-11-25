@@ -297,7 +297,7 @@ document.title = CONFIG.empresa + ' — Lista de Precios Mayoristas';
 // ============================================================
 // Datos
 // ============================================================
-fetch(CONFIG.datos)
+fetch(CONFIG.datos + '?r=2', { cache: 'no-cache' })
   .then(r => r.ok ? r.json() : Promise.reject())
   .then(data => {
     if (data.fecha) $('dateBadge').textContent = 'Lista al ' + data.fecha; else $('dateBadge').remove();
@@ -423,7 +423,7 @@ addEventListener('scroll', () => {
   if (!raw) return;
   const cartMode = raw.slice(-1).toLowerCase() === 'c';
   const id = (cartMode ? raw.slice(0, -1) : raw).toUpperCase();
-  fetch(CONFIG.vendedores).then(r => r.ok ? r.text() : Promise.reject()).then(txt => {
+  fetch(CONFIG.vendedores + '?r=2', { cache: 'no-cache' }).then(r => r.ok ? r.text() : Promise.reject()).then(txt => {
     for (const line of txt.split('\n')) {
       const l = line.trim();
       if (!l || l.startsWith('#')) continue;
