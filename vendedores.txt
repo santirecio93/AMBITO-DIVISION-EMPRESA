@@ -1,0 +1,2 @@
+# CODIGO,TELEFONO (con codigo de pais, sin + ni espacios)
+JP,5491100000000

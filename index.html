@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lista de Precios Mayoristas</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ===== CAMBIÁ ACÁ LOS COLORES DE TU MARCA ===== */
+  :root {
+    --accent: #F47920;
+    --accent-dark: #d4650f;
+    --accent-soft: rgba(244,121,32,0.15);
+    --bg: #fff; --surface2: #f6f6f6; --border: #e8e8e8;
+    --text: #1a1a1a; --text2: #666; --text3: #aaa;
+    --green: #2da84e; --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Nunito', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .header { background:#fff; border-bottom:2px solid var(--border); padding:12px 16px 10px; position:sticky; top:0; z-index:100; box-shadow:0 2px 10px rgba(0,0,0,.07); transition:padding .4s ease; }
+  .search-wrap, .controls { max-height:200px; opacity:1; transition:max-height .4s ease, opacity .4s ease, margin .4s ease; }
+  @media (max-width:768px) {
+    .header.compact { padding:8px 16px 6px; }
+    .header.compact .search-wrap, .header.compact .controls { max-height:0; opacity:0; overflow:hidden; margin:0; pointer-events:none; }
+    .header.compact .header-top { margin-bottom:0; }
+    .header.compact .subtitle { opacity:0; max-height:0; margin:0; }
+  }
+  .header-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; transition:margin .4s ease; }
+  .logo-wrap { display:flex; flex-direction:column; gap:1px; }
+  .logo-img { height:56px; width:auto; display:block; }
+  .logo-text { font-size:28px; font-weight:800; color:var(--accent); letter-spacing:-.5px; line-height:1.1; }
+  .subtitle { font-size:9px; font-weight:700; color:var(--text3); letter-spacing:1.8px; text-transform:uppercase; margin-top:2px; max-height:30px; overflow:hidden; transition:opacity .4s, max-height .4s; }
+  .date-badge { font-size:10px; color:var(--text3); font-weight:600; background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:4px 10px; white-space:nowrap; }
+
+  .search-wrap { position:relative; margin-bottom:10px; }
+  .search-icon { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text3); font-size:15px; pointer-events:none; }
+  .search-input { width:100%; background:var(--surface2); border:1.5px solid var(--border); border-radius:var(--radius); padding:11px 40px 11px 36px; color:var(--text); font-family:inherit; font-size:15px; font-weight:600; outline:none; transition:border-color .2s; }
+  .search-input:focus { border-color:var(--accent); }
+  .search-input::placeholder { color:var(--text3); font-weight:400; }
+  .search-input::-webkit-search-cancel-button { display:none; }
+  .clear-btn { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:var(--border); border:none; border-radius:50%; width:22px; height:22px; color:var(--text2); cursor:pointer; font-size:13px; display:none; align-items:center; justify-content:center; }
+
+  .controls { display:flex; align-items:center; gap:10px; }
+  .dto-label { font-size:12px; color:var(--text2); font-weight:700; white-space:nowrap; }
+  .dto-wrap { display:flex; align-items:center; background:var(--surface2); border:1.5px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .dto-btn { background:none; border:none; color:var(--text3); font-size:18px; width:36px; height:36px; cursor:pointer; font-weight:700; }
+  .dto-btn:active { background:var(--border); color:var(--accent); }
+  .dto-input { background:none; border:none; color:var(--accent); font-family:inherit; font-size:17px; font-weight:800; text-align:center; width:44px; outline:none; -moz-appearance:textfield; }
+  .dto-input::-webkit-outer-spin-button, .dto-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .dto-pct { color:var(--text3); font-size:13px; font-weight:700; }
+  .iva-toggle { display:flex; align-items:center; gap:6px; margin-left:6px; cursor:pointer; user-select:none; }
+  .iva-toggle input { display:none; }
+  .iva-switch { width:36px; height:20px; background:var(--border); border-radius:10px; position:relative; transition:background .2s; flex-shrink:0; }
+  .iva-switch::after { content:''; position:absolute; width:16px; height:16px; background:#fff; border-radius:50%; top:2px; left:2px; transition:transform .2s; box-shadow:0 1px 3px rgba(0,0,0,.15); }
+  .iva-toggle input:checked + .iva-switch { background:var(--accent); }
+  .iva-toggle input:checked + .iva-switch::after { transform:translateX(16px); }
+  .iva-label { font-size:11px; font-weight:700; color:var(--text2); }
+  .results-badge { margin-left:auto; font-size:11px; color:var(--text3); font-weight:600; white-space:nowrap; }
+
+  .list-wrap { padding:8px 12px 90px; max-width:900px; margin:0 auto; }
+  .product-card { display:grid; grid-template-columns:auto 1fr auto; gap:0 12px; padding:10px 12px; background:#fff; border-radius:var(--radius); margin-bottom:6px; border:1px solid var(--border); transition:border-color .15s, box-shadow .15s; }
+  .product-card:active { border-color:var(--accent); }
+  .product-card.has-cart { grid-template-columns:auto 1fr auto auto; }
+  .code-col { display:flex; flex-direction:column; justify-content:center; min-width:52px; }
+  .code { font-size:13px; font-weight:700; color:var(--accent); line-height:1; }
+  .medida { font-size:10px; color:var(--text3); font-weight:600; margin-top:3px; }
+  .info-col { display:flex; flex-direction:column; justify-content:center; min-width:0; }
+  .product-name { font-size:13px; font-weight:600; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .product-color { font-size:11px; color:var(--text2); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .price-col { display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:2px; min-width:90px; }
+  .price-original { font-size:11px; color:var(--text3); font-weight:600; text-decoration:line-through; }
+  .price-final { font-size:15px; font-weight:800; color:var(--green); line-height:1; }
+  .price-only { font-size:15px; font-weight:800; line-height:1; }
+  .dto-tag { font-size:9px; background:rgba(45,168,78,.1); color:var(--green); border-radius:4px; padding:2px 5px; font-weight:700; }
+  .add-col { display:flex; align-items:center; }
+  .add-btn { background:var(--surface2); color:var(--accent); border:1.5px solid var(--border); border-radius:50%; width:32px; height:32px; font-size:20px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .12s; padding:0 0 1px; }
+  .add-btn:active { transform:scale(.85); }
+  .add-btn.ok { background:var(--green); color:#fff; border-color:var(--green); }
+  mark { background:var(--accent-soft); color:var(--accent-dark); border-radius:2px; padding:0 1px; }
+
+  .empty { text-align:center; padding:60px 20px; color:var(--text3); }
+  .empty-icon { font-size:48px; margin-bottom:12px; }
+  .empty h3 { font-size:16px; color:var(--text2); margin-bottom:6px; }
+  .empty p { font-size:13px; line-height:1.6; }
+  .loading { text-align:center; padding:40px 20px; color:var(--text3); font-size:13px; font-weight:600; }
+
+  .fab-group { position:fixed; bottom:20px; right:16px; display:flex; align-items:center; gap:10px; z-index:200; }
+  .fab, .fab-wa, .fab-cart { border:none; border-radius:50%; color:#fff; cursor:pointer; display:none; align-items:center; justify-content:center; transition:transform .15s; padding:0; }
+  .fab:active, .fab-wa:active, .fab-cart:active { transform:scale(.9); }
+  .fab { background:var(--accent); width:44px; height:44px; font-size:20px; font-weight:700; box-shadow:0 4px 16px rgba(0,0,0,.2); }
+  .fab-wa { background:#25D366; width:48px; height:48px; box-shadow:0 4px 16px rgba(37,211,102,.4); }
+  .fab-wa svg, .cart-send-btn svg { width:24px; height:24px; fill:#fff; }
+  .fab-cart { background:var(--accent); width:48px; height:48px; font-size:22px; position:relative; box-shadow:0 4px 16px rgba(0,0,0,.2); }
+  .cart-badge { position:absolute; top:-4px; right:-4px; background:#e53935; color:#fff; font-size:10px; font-weight:800; border-radius:10px; min-width:20px; height:20px; display:flex; align-items:center; justify-content:center; padding:0 4px; font-family:inherit; }
+
+  .cart-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); backdrop-filter:blur(4px); z-index:9998; display:none; }
+  .cart-panel { position:fixed; bottom:0; left:0; right:0; max-width:640px; margin:0 auto; background:#fff; border-radius:16px 16px 0 0; max-height:80vh; display:none; flex-direction:column; z-index:9999; box-shadow:0 -10px 40px rgba(0,0,0,.2); animation:slideUp .3s ease; }
+  .cart-header { display:flex; align-items:center; justify-content:space-between; padding:16px 18px 12px; border-bottom:1.5px solid var(--border); }
+  .cart-header h3 { font-size:16px; font-weight:800; }
+  .cart-header-actions { display:flex; align-items:center; gap:10px; }
+  .cart-clear { background:none; border:none; color:#e53935; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .cart-close { background:var(--surface2); border:none; border-radius:50%; width:30px; height:30px; font-size:16px; color:var(--text2); cursor:pointer; }
+  .cart-body { overflow-y:auto; flex:1; padding:6px 16px; }
+  .cart-empty { text-align:center; padding:40px 20px; color:var(--text3); font-size:13px; }
+  .cart-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+  .cart-item:last-child { border-bottom:none; }
+  .cart-item-info { flex:1; min-width:0; }
+  .cart-item-name { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cart-item-detail { font-size:11px; color:var(--text3); margin-top:1px; }
+  .cart-item-qty { display:flex; align-items:center; background:var(--surface2); border:1.5px solid var(--border); border-radius:8px; overflow:hidden; }
+  .cart-qty-btn { background:none; border:none; width:30px; height:30px; font-size:16px; font-weight:700; color:var(--text2); cursor:pointer; }
+  .cart-qty-val { font-size:14px; font-weight:800; min-width:24px; text-align:center; }
+  .cart-item-price { font-size:14px; font-weight:800; white-space:nowrap; min-width:70px; text-align:right; }
+  .cart-footer { padding:12px 18px 18px; border-top:1.5px solid var(--border); }
+  .cart-total-items { font-size:11px; color:var(--text3); font-weight:600; margin-bottom:10px; }
+  .cart-total { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .cart-total-label { font-size:14px; font-weight:700; color:var(--text2); }
+  .cart-total-value { font-size:20px; font-weight:800; }
+  .cart-disclaimer { font-size:10px; color:var(--text3); font-weight:600; text-align:center; margin-bottom:10px; line-height:1.4; }
+  .cart-send-btn { width:100%; padding:13px; background:#25D366; color:#fff; border:none; border-radius:var(--radius); font-family:inherit; font-size:15px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+
+  .legal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(6px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn .3s ease; }
+  .legal-modal { background:#fff; border-radius:16px; max-width:520px; width:100%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.25); animation:slideUp .4s ease; overflow:hidden; }
+  .legal-header { padding:20px 22px 14px; border-bottom:1.5px solid var(--border); }
+  .legal-header h2 { font-size:17px; font-weight:800; margin-bottom:2px; }
+  .legal-header p { font-size:11px; color:var(--text3); font-weight:600; }
+  .legal-body { padding:18px 22px; overflow-y:auto; flex:1; }
+  .legal-body p { font-size:12.5px; line-height:1.7; color:var(--text2); margin-bottom:12px; }
+  .legal-body p:last-child { color:var(--text); font-weight:700; margin-bottom:0; }
+  .legal-footer { padding:14px 22px 18px; border-top:1.5px solid var(--border); }
+  .legal-accept-btn { width:100%; padding:13px; background:var(--accent); color:#fff; border:none; border-radius:var(--radius); font-family:inherit; font-size:15px; font-weight:800; cursor:pointer; }
+  .legal-accept-btn:hover { background:var(--accent-dark); }
+  @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+  @keyframes slideUp { from { opacity:0; transform:translateY(30px) } to { opacity:1; transform:none } }
+  .hidden { display:none !important; }
+
+  @media (orientation:landscape) and (max-height:500px) {
+    .header { padding:5px 12px 6px; } .header-top { margin-bottom:6px; }
+    .logo-img { height:32px; } .logo-text { font-size:20px; } .subtitle { display:none; }
+    .search-input { padding:7px 40px 7px 36px; font-size:14px; } .dto-btn { height:30px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="legal-overlay" id="legalOverlay">
+  <div class="legal-modal">
+    <div class="legal-header"><h2>Términos y Condiciones</h2><p>Lista de Precios Mayoristas</p></div>
+    <div class="legal-body" id="legalBody"></div>
+    <div class="legal-footer"><button class="legal-accept-btn" id="legalAcceptBtn">Acepto los Términos y Condiciones</button></div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-top">
+    <div class="logo-wrap">
+      <div id="logo"></div>
+      <span class="subtitle">Lista de Precios Mayoristas</span>
+    </div>
+    <div class="date-badge" id="dateBadge"></div>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="search" class="search-input" id="searchInput" placeholder="Ej: latex 4 lt, esmalte blanco..." autocomplete="off" autocorrect="off" spellcheck="false">
+    <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕</button>
+  </div>
+  <div class="controls">
+    <span class="dto-label">Descuento:</span>
+    <div class="dto-wrap">
+      <button class="dto-btn" onclick="changeDto(-1)">−</button>
+      <input type="number" class="dto-input" id="dtoInput" value="0" min="0" max="99">
+      <span class="dto-pct">%</span>
+      <button class="dto-btn" onclick="changeDto(1)">+</button>
+    </div>
+    <label class="iva-toggle">
+      <input type="checkbox" id="ivaToggle" checked>
+      <span class="iva-switch"></span>
+      <span class="iva-label" id="ivaLabel">c/IVA</span>
+    </label>
+    <span class="results-badge" id="resultsBadge"></span>
+  </div>
+</div>
+
+<div class="list-wrap" id="listWrap"><div class="loading">Cargando productos...</div></div>
+
+<div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
+<div class="cart-panel" id="cartPanel">
+  <div class="cart-header">
+    <h3>🛒 Mi Pedido</h3>
+    <div class="cart-header-actions">
+      <button class="cart-clear" onclick="clearCart()">Vaciar</button>
+      <button class="cart-close" onclick="closeCart()">✕</button>
+    </div>
+  </div>
+  <div class="cart-body" id="cartBody"></div>
+  <div class="cart-footer" id="cartFooter">
+    <div class="cart-total-items" id="cartTotalItems"></div>
+    <div class="cart-total"><span class="cart-total-label">Total lista</span><span class="cart-total-value" id="cartTotalValue">$0</span></div>
+    <div class="cart-disclaimer">Los precios enviados son de lista. El vendedor aplicará el descuento correspondiente.</div>
+    <button class="cart-send-btn" onclick="sendCartWhatsApp()"><svg viewBox="0 0 24 24" id="waIcon2"></svg>Enviar pedido por WhatsApp</button>
+  </div>
+</div>
+
+<div class="fab-group">
+  <button class="fab-wa" id="fabWa" onclick="openWhatsApp()" aria-label="WhatsApp"><svg viewBox="0 0 24 24" id="waIcon1"></svg></button>
+  <button class="fab-cart" id="fabCart" onclick="openCart()" aria-label="Pedido">🛒<span class="cart-badge" id="cartBadge">0</span></button>
+  <button class="fab" id="fab" onclick="scrollTo({top:0,behavior:'smooth'})" aria-label="Arriba">↑</button>
+</div>
+
+<script>
+// ============================================================
+// CONFIGURACIÓN — editá esto con los datos de tu negocio
+// ============================================================
+const CONFIG = {
+  empresa: 'Ámbito División Empresa',         // nombre que aparece en el header y en WhatsApp
+  logo: '',                           // ej: 'logo.png' (si queda vacío se muestra el nombre)
+  datos: 'productos.json',            // catálogo
+  vendedores: 'vendedores.txt',       // CODIGO,TELEFONO por línea
+  iva: 1.21,
+  pageSize: 40,
+  legal: [
+    'La información contenida en la presente lista de precios tiene carácter meramente informativo y no constituye una oferta comercial vinculante.',
+    'Los precios publicados son de referencia y pueden modificarse sin previo aviso. El precio final será el que figure en el presupuesto emitido por el vendedor al momento de la operación.',
+    'Los precios están expresados en pesos argentinos (ARS) y pueden incluir o no IVA según la opción seleccionada.',
+    'La disponibilidad de los productos está sujeta a stock al momento de confirmar el pedido.',
+    'Los precios no incluyen costos de envío ni otros cargos, salvo indicación expresa en el presupuesto.',
+    'Los errores tipográficos u omisiones en la información publicada no generarán responsabilidad para la empresa.',
+    'Al seleccionar "Aceptar", el usuario declara haber leído y aceptado estos términos, reconociendo que los precios informados son referenciales y no vinculantes.'
+  ]
+};
+
+const WA_PATH = 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z';
+['waIcon1','waIcon2'].forEach(id => document.getElementById(id).innerHTML = `<path d="${WA_PATH}"/>`);
+
+// ============================================================
+// Estado
+// ============================================================
+let ALL = [];           // [{codigo,nombre,color,canmed,med,precio,_q}]
+let filtered = [];
+let shown = 0;
+let dto = 0, conIva = true, query = '';
+let vendedorTel = null, vendorMode = false;
+const cart = {};
+
+const $ = id => document.getElementById(id);
+const fmt = n => '$' + Math.round(n).toLocaleString('es-AR');
+const fmtMedida = (c, m) => (c && m) ? `${c} ${m}` : '';
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const norm = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const base = p => conIva ? p.precio : p.precio / CONFIG.iva;
+
+// Header
+$('logo').innerHTML = CONFIG.logo
+  ? `<img class="logo-img" src="${esc(CONFIG.logo)}" alt="${esc(CONFIG.empresa)}">`
+  : `<div class="logo-text">${esc(CONFIG.empresa)}</div>`;
+document.title = CONFIG.empresa + ' — Lista de Precios Mayoristas';
+
+// ============================================================
+// Datos
+// ============================================================
+fetch(CONFIG.datos)
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(data => {
+    if (data.fecha) $('dateBadge').textContent = 'Lista al ' + data.fecha; else $('dateBadge').remove();
+    ALL = data.productos.map(r => {
+      const p = { codigo:String(r[0]), nombre:r[1]||'', color:r[2]||'', canmed:r[3]||'', med:r[4]||'', precio:Number(r[5])||0 };
+      p._q = norm([p.codigo, p.nombre, p.color, p.canmed + ' ' + p.med, p.canmed + p.med].join(' '));
+      return p;
+    });
+    applyFilter();
+  })
+  .catch(() => {
+    $('listWrap').innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><h3>Error al cargar</h3><p>Por favor, recargá la página.</p></div>';
+  });
+
+// Búsqueda: todas las palabras tienen que aparecer (en cualquier orden)
+function applyFilter() {
+  const words = norm(query).split(/\s+/).filter(Boolean);
+  filtered = words.length ? ALL.filter(p => words.every(w => p._q.includes(w))) : ALL;
+  $('resultsBadge').textContent = filtered.length.toLocaleString('es-AR') + (words.length ? ' resultados' : ' productos');
+  shown = 0;
+  $('listWrap').innerHTML = '';
+  if (!filtered.length) {
+    $('listWrap').innerHTML = '<div class="empty"><div class="empty-icon">🔎</div><h3>Sin resultados</h3><p>Probá con el código, parte del nombre<br>o el color del producto.</p></div>';
+    return;
+  }
+  renderMore();
+}
+
+function renderMore() {
+  const wrap = $('listWrap');
+  wrap.querySelector('.loading')?.remove();
+  const slice = filtered.slice(shown, shown + CONFIG.pageSize);
+  wrap.insertAdjacentHTML('beforeend', slice.map(card).join(''));
+  shown += slice.length;
+  if (shown < filtered.length) wrap.insertAdjacentHTML('beforeend', '<div class="loading">Cargando más productos...</div>');
+}
+
+function highlight(text) {
+  const words = norm(query).split(/\s+/).filter(w => w.length > 1);
+  let out = esc(text);
+  if (!words.length) return out;
+  const re = new RegExp('(' + words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi');
+  return out.replace(re, '<mark>$1</mark>');
+}
+
+function card(p) {
+  const pb = base(p), pf = pb * (1 - dto / 100);
+  const price = dto > 0
+    ? `<div class="price-original">${fmt(pb)}</div><div class="price-final">${fmt(pf)}</div><div class="dto-tag">-${dto}%</div>`
+    : `<div class="price-only">${fmt(pb)}</div>`;
+  const add = vendorMode ? `<div class="add-col"><button class="add-btn" data-code="${esc(p.codigo)}" onclick="addToCart(this)">+</button></div>` : '';
+  return `<div class="product-card${vendorMode ? ' has-cart' : ''}">
+    <div class="code-col"><div class="code">${highlight(p.codigo)}</div>${p.canmed && p.med ? `<div class="medida">${esc(fmtMedida(p.canmed, p.med))}</div>` : ''}</div>
+    <div class="info-col"><div class="product-name">${highlight(p.nombre)}</div>${p.color ? `<div class="product-color">${highlight(p.color)}</div>` : ''}</div>
+    <div class="price-col">${price}</div>${add}
+  </div>`;
+}
+
+// ============================================================
+// Controles
+// ============================================================
+let timer;
+$('searchInput').addEventListener('input', function () {
+  query = this.value;
+  $('clearBtn').style.display = query ? 'flex' : 'none';
+  clearTimeout(timer);
+  timer = setTimeout(applyFilter, 200);
+});
+function clearSearch() { $('searchInput').value = ''; query = ''; $('clearBtn').style.display = 'none'; applyFilter(); }
+
+function setDto(v) { dto = Math.max(0, Math.min(99, v)); $('dtoInput').value = dto; applyFilter(); }
+function changeDto(d) { setDto((parseInt($('dtoInput').value) || 0) + d * 5); }
+$('dtoInput').addEventListener('change', function () { setDto(parseInt(this.value) || 0); });
+
+$('ivaToggle').addEventListener('change', function () {
+  conIva = this.checked;
+  $('ivaLabel').textContent = conIva ? 'c/IVA' : 's/IVA';
+  applyFilter();
+});
+
+// Scroll: header compacto, botón arriba, carga infinita
+let lastY = 0;
+const header = document.querySelector('.header');
+addEventListener('scroll', () => {
+  const y = scrollY;
+  $('fab').style.display = y > 300 ? 'flex' : 'none';
+  if (y > 120 && y > lastY) header.classList.add('compact');
+  else if (y < lastY) header.classList.remove('compact');
+  lastY = y;
+  if (shown < filtered.length && innerHeight + y >= document.body.offsetHeight - 400) renderMore();
+}, { passive: true });
+
+// ============================================================
+// Modo vendedor: /?v=CODIGO (WhatsApp) — /?v=CODIGOc (WhatsApp + carrito)
+// ============================================================
+(function () {
+  const raw = (new URLSearchParams(location.search).get('v') || '').trim();
+  if (!raw) return;
+  const cartMode = raw.slice(-1).toLowerCase() === 'c';
+  const id = (cartMode ? raw.slice(0, -1) : raw).toUpperCase();
+  fetch(CONFIG.vendedores).then(r => r.ok ? r.text() : Promise.reject()).then(txt => {
+    for (const line of txt.split('\n')) {
+      const l = line.trim();
+      if (!l || l.startsWith('#')) continue;
+      const [cod, tel] = l.split(',').map(s => s.trim());
+      if (cod.toUpperCase() !== id) continue;
+      vendedorTel = tel.replace(/\D/g, '');
+      $('fabWa').style.display = 'flex';
+      if (cartMode) { vendorMode = true; $('fabCart').style.display = 'flex'; if (ALL.length) applyFilter(); }
+      break;
+    }
+  }).catch(() => {});
+})();
+
+function openWhatsApp() {
+  if (!vendedorTel) return;
+  open('https://wa.me/' + vendedorTel + '?text=' + encodeURIComponent(`Hola, vi la lista de ${CONFIG.empresa} y quiero consultar un precio`), '_blank');
+}
+
+// ============================================================
+// Carrito
+// ============================================================
+function addToCart(btn) {
+  const p = ALL.find(x => x.codigo === btn.dataset.code);
+  if (!p) return;
+  cart[p.codigo] ? cart[p.codigo].qty++ : (cart[p.codigo] = { p, qty: 1 });
+  updateBadge();
+  btn.classList.add('ok'); btn.textContent = '✓';
+  setTimeout(() => { btn.classList.remove('ok'); btn.textContent = '+'; }, 400);
+}
+const updateBadge = () => $('cartBadge').textContent = Object.values(cart).reduce((s, c) => s + c.qty, 0);
+function openCart() { renderCart(); $('cartOverlay').style.display = 'block'; $('cartPanel').style.display = 'flex'; document.querySelector('.fab-group').style.visibility = 'hidden'; document.body.style.overflow = 'hidden'; }
+function closeCart() { $('cartOverlay').style.display = 'none'; $('cartPanel').style.display = 'none'; document.querySelector('.fab-group').style.visibility = ''; document.body.style.overflow = ''; }
+function clearCart() { for (const k in cart) delete cart[k]; updateBadge(); renderCart(); }
+function changeQty(cod, d) { if (!cart[cod]) return; cart[cod].qty += d; if (cart[cod].qty <= 0) delete cart[cod]; updateBadge(); renderCart(); }
+
+function renderCart() {
+  const items = Object.values(cart);
+  if (!items.length) {
+    $('cartBody').innerHTML = '<div class="cart-empty">El pedido está vacío.<br>Agregá productos con el botón <b>+</b></div>';
+    $('cartFooter').style.display = 'none';
+    return;
+  }
+  $('cartFooter').style.display = 'block';
+  let total = 0, n = 0;
+  $('cartBody').innerHTML = items.map(({ p, qty }) => {
+    const sub = base(p) * qty; total += sub; n += qty;
+    const det = [p.codigo, p.color, fmtMedida(p.canmed, p.med)].filter(Boolean).join(' · ');
+    return `<div class="cart-item">
+      <div class="cart-item-info"><div class="cart-item-name">${esc(p.nombre)}</div><div class="cart-item-detail">${esc(det)}</div></div>
+      <div class="cart-item-qty"><button class="cart-qty-btn" onclick="changeQty('${esc(p.codigo)}',-1)">−</button><span class="cart-qty-val">${qty}</span><button class="cart-qty-btn" onclick="changeQty('${esc(p.codigo)}',1)">+</button></div>
+      <div class="cart-item-price">${fmt(sub)}</div></div>`;
+  }).join('');
+  $('cartTotalItems').textContent = n + ' producto' + (n !== 1 ? 's' : '') + ' en el pedido';
+  $('cartTotalValue').textContent = fmt(total);
+}
+
+function sendCartWhatsApp() {
+  const items = Object.values(cart);
+  if (!vendedorTel || !items.length) return;
+  let total = 0;
+  const lines = items.map(({ p, qty }) => {
+    const sub = base(p) * qty; total += sub;
+    const m = fmtMedida(p.canmed, p.med);
+    return `• ${qty}x [${p.codigo}] ${p.nombre}${p.color ? ' (' + p.color + ')' : ''}${m ? ' ' + m : ''} — ${fmt(sub)}`;
+  });
+  const msg = `*Pedido desde Lista ${CONFIG.empresa}*\n\n${lines.join('\n')}\n\n*Total lista: ${fmt(total)}* ${conIva ? 'c/IVA' : 's/IVA'}\n_Precios de lista. El vendedor aplicará el descuento correspondiente._`;
+  open('https://wa.me/' + vendedorTel + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// ============================================================
+// Términos y condiciones (se aceptan una vez por sesión)
+// ============================================================
+if (sessionStorage.getItem('legalAccepted')) {
+  $('legalOverlay').classList.add('hidden');
+} else {
+  document.body.style.overflow = 'hidden';
+  $('legalBody').innerHTML = CONFIG.legal.map(t => '<p>' + esc(t) + '</p>').join('');
+}
+$('legalAcceptBtn').addEventListener('click', () => {
+  sessionStorage.setItem('legalAccepted', '1');
+  const o = $('legalOverlay');
+  o.style.transition = 'opacity .3s'; o.style.opacity = '0';
+  document.body.style.overflow = '';
+  setTimeout(() => o.classList.add('hidden'), 300);
+});
+</script>
+</body>
+</html>
