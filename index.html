@@ -175,7 +175,11 @@
   .cli-btn { background:#fff; color:#000; border:none; border-radius:var(--pill); padding:6px 14px; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
   .cli-btn:hover { background:var(--amarillo); }
   .cli-btn.on { background:#1f9d48; color:#fff; }
-  .cond-pill { background:rgba(31,157,72,.18); color:#7ee2a0; border:1.5px solid #1f9d48; border-radius:var(--pill); padding:8px 14px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  /* descuento fijado por el cliente identificado */
+  .dto-wrap.locked { border-color:#1f9d48; }
+  .dto-wrap.locked .dto-btn { display:none; }
+  .dto-wrap.locked .dto-input { color:#7ee2a0; width:52px; cursor:default; }
+  .dto-wrap.locked .dto-pct { padding-right:12px; color:#7ee2a0; }
   .cli-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(6px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn .2s ease; }
   .cli-modal { max-width:420px; }
   .cli-label { display:block; font-size:12px; font-weight:700; color:var(--tinta); margin:4px 0 6px; }
@@ -292,7 +296,6 @@
     <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕</button>
   </div>
   <div class="controls">
-    <button class="cond-pill hidden" id="condPill" onclick="abrirCliente()"></button>
     <span class="dto-label">Descuento:</span>
     <div class="dto-wrap">
       <button class="dto-btn" onclick="changeDto(-1)">−</button>
@@ -380,17 +383,15 @@ let fechaLista = '';
 
 // ============================================================
 // Cliente identificado y sus condiciones comerciales
-// cliente = { nombre, cuit, descuento, rubros: { 'Automotor': 15, ... } }
+// cliente = { nombre, cuit, descuento }
+// Las condiciones comerciales solo cambian el descuento: al identificarse,
+// el cuadro "Descuento" toma el % del cliente y queda fijo.
 // ============================================================
 let cliente = null;
-// % de descuento que corresponde a un producto
-let dtoRubro = {};   // rubro en mayúsculas -> % (para comparar sin importar mayúsculas)
-const dtoDe = p => cliente ? (dtoRubro[String(p.color).toUpperCase()] ?? cliente.descuento ?? 0) : dto;
-const conDescuento = p => base(p) * (1 - dtoDe(p) / 100);
-const hayDescuento = () => cliente ? (cliente.descuento > 0 || Object.values(cliente.rubros).some(v => v > 0)) : dto > 0;
-const etiquetaDto = () => !cliente ? `Descuento ${dto}%`
-  : Object.keys(cliente.rubros).length ? 'Bonificación según condiciones comerciales'
-  : `Bonificación ${cliente.descuento}%`;
+const dtoDe = () => dto;
+const conDescuento = p => base(p) * (1 - dto / 100);
+const hayDescuento = () => dto > 0;
+const etiquetaDto = () => `Descuento ${dto}%`;
 const cuitFmt = c => c.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3');
 
 // Misma derivación que herramientas/clientes.js
@@ -449,16 +450,16 @@ async function ingresarCliente() {
 }
 
 function aplicarCliente(c) {
-  cliente = c ? { ...c, rubros: c.rubros || {} } : null;
-  dtoRubro = cliente ? Object.fromEntries(Object.entries(cliente.rubros).map(([k, v]) => [k.trim().toUpperCase(), v])) : {};
-  const btn = $('cliBtn'), pill = $('condPill');
+  cliente = c || null;
+  const btn = $('cliBtn');
   btn.classList.toggle('on', !!cliente);
   btn.textContent = cliente ? '👤 ' + cliente.nombre : '👤 Soy cliente';
-  pill.classList.toggle('hidden', !cliente);
-  pill.textContent = cliente ? '✓ ' + (Object.keys(cliente.rubros).length ? 'Tus condiciones aplicadas' : `Tu bonificación: ${cliente.descuento}%`) : '';
-  // el descuento manual se oculta mientras hay un cliente identificado
-  document.querySelector('.dto-label').classList.toggle('hidden', !!cliente);
-  document.querySelector('.dto-wrap').classList.toggle('hidden', !!cliente);
+  // el cuadro de descuento toma el % del cliente y queda bloqueado
+  document.querySelector('.dto-label').textContent = cliente ? 'Tu descuento:' : 'Descuento:';
+  document.querySelector('.dto-wrap').classList.toggle('locked', !!cliente);
+  $('dtoInput').readOnly = !!cliente;
+  dto = cliente ? Math.max(0, Math.min(99, Number(cliente.descuento) || 0)) : 0;
+  $('dtoInput').value = dto;
   if (ALL.length) applyFilter();
   if ($('cartPanel').style.display === 'flex') renderCart();
 }
@@ -477,9 +478,8 @@ function mostrarInfoCliente() {
   $('cliTitulo').textContent = logueado ? cliente.nombre : 'Ingresá como cliente';
   $('cliSub').textContent = logueado ? 'CUIT ' + cuitFmt(cliente.cuit) : 'Accedé a tus condiciones comerciales';
   if (!logueado) return;
-  const filas = [['Bonificación general', cliente.descuento], ...Object.entries(cliente.rubros)];
   $('cliInfo').innerHTML = `<p style="margin-bottom:6px">Tus condiciones comerciales:</p>
-    <table class="cond-tabla">${filas.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}%</td></tr>`).join('')}</table>
+    <table class="cond-tabla"><tr><td>Descuento sobre lista</td><td>${esc(cliente.descuento)}%</td></tr></table>
     <button class="cli-salir" onclick="salirCliente()">Cerrar sesión</button>`;
 }
 function abrirCliente() {
@@ -633,7 +633,7 @@ $('searchInput').addEventListener('input', function () {
 });
 function clearSearch() { $('searchInput').value = ''; query = ''; $('clearBtn').style.display = 'none'; applyFilter(); }
 
-function setDto(v) { dto = Math.max(0, Math.min(99, v)); $('dtoInput').value = dto; applyFilter(); }
+function setDto(v) { if (cliente) { $('dtoInput').value = dto; return; } dto = Math.max(0, Math.min(99, v)); $('dtoInput').value = dto; applyFilter(); }
 function changeDto(d) { setDto((parseInt($('dtoInput').value) || 0) + d * 5); }
 $('dtoInput').addEventListener('change', function () { setDto(parseInt(this.value) || 0); });
 
@@ -851,7 +851,7 @@ async function generarPDF() {
   if (b.totalLista - b.total > 0.5) {
     doc.text('Subtotal lista', W - 50, y, { align: 'right' }); doc.text($$(b.totalLista), W - 14, y, { align: 'right' }); y += 5.5;
     doc.setTextColor(31, 157, 72);
-    doc.text(cliente && Object.keys(cliente.rubros).length ? 'Bonificación' : etiquetaDto(), W - 50, y, { align: 'right' }); doc.text('- ' + $$(b.totalLista - b.total), W - 14, y, { align: 'right' }); y += 4;
+    doc.text(etiquetaDto(), W - 50, y, { align: 'right' }); doc.text('- ' + $$(b.totalLista - b.total), W - 14, y, { align: 'right' }); y += 4;
   }
   doc.setFillColor(255, 209, 0); doc.roundedRect(W - 90, y, 76, 11, 2, 2, 'F');
   doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);

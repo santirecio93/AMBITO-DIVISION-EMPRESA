@@ -1,17 +1,16 @@
 # Herramientas de la lista
 
-## Clientes y condiciones comerciales
+## Clientes y su descuento
 
 1. Completá el Excel de clientes (guardalo **fuera** de esta carpeta, porque tiene las claves).
    Columnas:
 
-   | CUIT | RAZON SOCIAL | CLAVE | DESCUENTO | DTO Automotor | DTO Industria | … |
-   |---|---|---|---|---|---|---|
-   | 20-12345678-6 | CLIENTE SA | *(vacía)* | 10 | 15 | | |
+   | CUIT | RAZON SOCIAL | CLAVE | DESCUENTO |
+   |---|---|---|---|
+   | 20-12345678-6 | CLIENTE SA | *(vacía)* | 10 |
 
    - **CLAVE** vacía: se genera sola y queda guardada en el mismo Excel, para pasársela al cliente.
-   - **DESCUENTO**: % general.
-   - **DTO \<Rubro\>**: opcional, % para un rubro puntual. Escribí el rubro igual que en la lista.
+   - **DESCUENTO**: % que se le aplica al cliente cuando se identifica.
 
 2. Generá los archivos cifrados:
 

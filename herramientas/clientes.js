@@ -4,12 +4,9 @@
 // Uso:   node herramientas/clientes.js "<ruta al Excel de clientes>"
 //
 // Excel (primera hoja), una fila por cliente:
-//   CUIT | RAZON SOCIAL | CLAVE | DESCUENTO | DTO <Rubro> | DTO <Rubro> ...
+//   CUIT | RAZON SOCIAL | CLAVE | DESCUENTO
 //   - CLAVE vacía  -> se genera una y se guarda en el mismo Excel.
-//   - DESCUENTO    -> % general para todos los productos.
-//   - DTO <Rubro>  -> (opcional) % para un rubro puntual, pisa al general.
-//                     El nombre tiene que coincidir con el RUBRO de la lista,
-//                     ej: "DTO Automotor", "DTO Hogar y Obra".
+//   - DESCUENTO    -> % que se le aplica al cliente cuando se identifica.
 //
 // Salida: carpeta clientes/ con un archivo cifrado por cliente. Solo se puede
 // abrir con CUIT + CLAVE, así que se puede publicar aunque el repo sea público.
@@ -61,11 +58,7 @@ for (const [i, f] of filas.entries()) {
   if (cuit.length !== 11) { errores.push(`Fila ${i + 2}: CUIT inválido (${k['CUIT']})`); continue; }
   let clave = String(k['CLAVE'] || '').trim().toUpperCase();
   if (!clave) { clave = nuevaClave(); f[Object.keys(f).find(c => norm(c) === 'CLAVE') || 'CLAVE'] = clave; nuevas++; }
-  const rubros = {};
-  for (const [col, val] of Object.entries(f)) {   // nombres de columna originales (respeta mayúsculas)
-    if (norm(col).startsWith('DTO ') && pct(val) !== null) rubros[String(col).trim().slice(4).trim()] = pct(val);
-  }
-  const cliente = { nombre, cuit, descuento: pct(k['DESCUENTO']) ?? 0, rubros };
+  const cliente = { nombre, cuit, descuento: pct(k['DESCUENTO']) ?? 0 };
   const { id, key } = derivar(cuit, clave);
   fs.writeFileSync(path.join(outDir, id + '.json'), JSON.stringify(cifrar(cliente, key)));
   ok++;
