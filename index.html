@@ -107,6 +107,14 @@
   .add-btn:hover { background:var(--amarillo); color:#000; }
   .add-btn:active { transform:scale(.85); }
   .add-btn.ok { background:var(--green); color:#fff; }
+  /* Producto que ya está en el presupuesto */
+  .product-card.in-cart { background:#fffbe6; border-color:var(--amarillo); }
+  .qty-step { display:flex; align-items:center; background:#000; border-radius:var(--pill); height:34px; padding:0 2px; }
+  .qty-step button { background:none; border:none; color:var(--amarillo); width:28px; height:34px; font-size:18px; font-weight:700; cursor:pointer; font-family:inherit; padding:0; }
+  .qty-step button:active { transform:scale(.85); }
+  .qty-step input { width:36px; background:none; border:none; color:#fff; font-family:inherit; font-size:15px; font-weight:900; text-align:center; outline:none; -moz-appearance:textfield; padding:0; }
+  .qty-step input::-webkit-outer-spin-button, .qty-step input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .line-total { font-size:11px; color:var(--tinta); font-weight:700; margin-top:3px; white-space:nowrap; }
   mark { background:var(--amarillo-soft); color:#000; border-radius:3px; padding:0 1px; }
 
   .empty { text-align:center; padding:60px 20px; color:var(--text3); }
@@ -202,6 +210,9 @@
     .price-only, .price-final { font-size:15px; }
     .add-col { grid-area:add; }
     .add-btn { width:32px; height:32px; }
+    .qty-step { height:32px; }
+    .qty-step button { width:24px; height:32px; }
+    .qty-step input { width:30px; font-size:14px; }
   }
 
   @media (orientation:landscape) and (max-height:500px) {
@@ -423,12 +434,34 @@ function card(p) {
     : dto > 0
     ? `<div class="price-original">${fmt(pb)}</div><div class="price-final">${fmt(pf)}</div><div class="dto-tag">-${dto}%</div>`
     : `<div class="price-only">${fmt(pb)}</div>`;
-  const add = `<div class="add-col"><button class="add-btn" data-code="${esc(p.codigo)}" onclick="addToCart(this)" aria-label="Agregar al presupuesto">+</button></div>`;
-  return `<div class="product-card has-cart">
+  return `<div class="product-card has-cart${cart[p.codigo] ? ' in-cart' : ''}" data-code="${esc(p.codigo)}">
     <div class="code-col"><div class="code">${highlight(p.codigo)}</div>${p.estado ? `<div class="estado ${estadoClase(p.estado)}">${esc(titulo(p.estado))}</div>` : ''}</div>
     <div class="info-col"><div class="product-name">${highlight(p.nombre)}</div>${p.color ? `<div class="product-color">${highlight(p.color)}</div>` : ''}</div>
-    <div class="price-col">${price}</div>${add}
+    <div class="price-col">${price}${lineTotal(p)}</div><div class="add-col">${addCol(p)}</div>
   </div>`;
+}
+
+// Botón "+" si no está en el presupuesto; contador "− N +" si ya está
+function addCol(p) {
+  const c = cart[p.codigo], cod = esc(p.codigo);
+  if (!c) return `<button class="add-btn" onclick="listQty('${cod}',1)" aria-label="Agregar al presupuesto">+</button>`;
+  return `<div class="qty-step"><button onclick="listQty('${cod}',-1)" aria-label="Quitar uno">−</button><input type="number" min="0" inputmode="numeric" value="${c.qty}" onchange="setQty('${cod}',this.value)" onclick="this.select()" aria-label="Cantidad"><button onclick="listQty('${cod}',1)" aria-label="Agregar uno">+</button></div>`;
+}
+// Con más de 1 unidad, muestra el subtotal de esa línea debajo del precio
+function lineTotal(p) {
+  const c = cart[p.codigo];
+  if (!c || c.qty < 2 || !p.precio) return '';
+  return `<div class="line-total">${c.qty} u. = ${fmt(base(p) * (1 - dto / 100) * c.qty)}</div>`;
+}
+// Actualiza solo la tarjeta de ese producto (sin redibujar toda la lista)
+function refreshCard(cod) {
+  const el = document.querySelector(`.product-card[data-code="${CSS.escape(cod)}"]`);
+  const p = cart[cod]?.p || ALL.find(x => x.codigo === cod);
+  if (!el || !p) return;
+  el.classList.toggle('in-cart', !!cart[cod]);
+  el.querySelector('.add-col').innerHTML = addCol(p);
+  el.querySelector('.line-total')?.remove();
+  el.querySelector('.price-col').insertAdjacentHTML('beforeend', lineTotal(p));
 }
 
 // ============================================================
@@ -495,14 +528,18 @@ function openWhatsApp() {
 // ============================================================
 // Carrito
 // ============================================================
-function addToCart(btn) {
-  const p = ALL.find(x => x.codigo === btn.dataset.code);
-  if (!p) return;
-  cart[p.codigo] ? cart[p.codigo].qty++ : (cart[p.codigo] = { p, qty: 1 });
+// Cambia la cantidad de un producto (desde la lista o desde el panel)
+function setQty(cod, v) {
+  const n = Math.max(0, Math.min(99999, parseInt(v) || 0));
+  if (n === 0) delete cart[cod];
+  else if (cart[cod]) cart[cod].qty = n;
+  else { const p = ALL.find(x => x.codigo === cod); if (!p) return; cart[cod] = { p, qty: n }; }
+  if (typeof pendiente !== 'undefined' && pendiente) { pendiente = null; setShareLabel(SHARE_LABEL); }
   updateBadge();
-  btn.classList.add('ok'); btn.textContent = '✓';
-  setTimeout(() => { btn.classList.remove('ok'); btn.textContent = '+'; }, 400);
+  refreshCard(cod);
+  if ($('cartPanel').style.display === 'flex') renderCart();
 }
+function listQty(cod, d) { setQty(cod, (cart[cod]?.qty || 0) + d); }
 // El presupuesto se guarda en el navegador del cliente (sobrevive a cerrar la página)
 function guardarCarrito() {
   try { localStorage.setItem('presupuesto', JSON.stringify(Object.values(cart).map(c => [c.p.codigo, c.qty]))); } catch (e) {}
@@ -520,8 +557,8 @@ function restaurarCarrito() {
 const updateBadge = () => { $('cartBadge').textContent = Object.values(cart).reduce((s, c) => s + c.qty, 0); guardarCarrito(); };
 function openCart() { renderCart(); pendiente = null; cargarPDF().catch(() => {}); logoComoPNG(); $('cartOverlay').style.display = 'block'; $('cartPanel').style.display = 'flex'; document.querySelector('.fab-group').style.visibility = 'hidden'; document.body.style.overflow = 'hidden'; }
 function closeCart() { $('cartOverlay').style.display = 'none'; $('cartPanel').style.display = 'none'; document.querySelector('.fab-group').style.visibility = ''; document.body.style.overflow = ''; }
-function clearCart() { for (const k in cart) delete cart[k]; updateBadge(); renderCart(); }
-function changeQty(cod, d) { if (!cart[cod]) return; if (pendiente) { pendiente = null; setShareLabel(SHARE_LABEL); } cart[cod].qty += d; if (cart[cod].qty <= 0) delete cart[cod]; updateBadge(); renderCart(); }
+function clearCart() { const cods = Object.keys(cart); for (const k of cods) delete cart[k]; updateBadge(); renderCart(); cods.forEach(refreshCard); }
+function changeQty(cod, d) { if (cart[cod]) listQty(cod, d); }
 
 // Calcula el presupuesto con el descuento y el IVA elegidos en pantalla
 function calcularPresupuesto() {
