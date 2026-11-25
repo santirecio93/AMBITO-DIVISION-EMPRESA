@@ -67,6 +67,25 @@
   .iva-label { font-size:12px; font-weight:700; color:#fff; }
   .results-badge { margin-left:auto; font-size:12px; color:#bdbdbd; font-weight:500; white-space:nowrap; }
 
+  /* Filtros por estado */
+  .chips { display:flex; gap:6px; overflow-x:auto; margin-top:10px; padding-bottom:2px; scrollbar-width:none; max-height:60px; transition:max-height .4s, opacity .4s, margin .4s; }
+  .chips::-webkit-scrollbar { display:none; }
+  .chip { flex-shrink:0; background:#1b1b1b; color:#ddd; border:1.5px solid #333; border-radius:var(--pill); padding:6px 12px; font-family:inherit; font-size:12px; font-weight:500; cursor:pointer; white-space:nowrap; transition:background .15s, color .15s, border-color .15s; }
+  .chip b { font-weight:700; color:#888; margin-left:4px; }
+  .chip:hover { border-color:var(--amarillo); }
+  .chip.on { background:var(--amarillo); color:#000; border-color:var(--amarillo); font-weight:700; }
+  .chip.on b { color:#000; opacity:.6; }
+  @media (max-width:768px) { .header.compact .chips { max-height:0; opacity:0; margin:0; overflow:hidden; } }
+
+  .estado { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; border-radius:var(--pill); padding:2px 7px; margin-top:6px; white-space:nowrap; }
+  .e-activo { background:rgba(31,157,72,.12); color:#1f7a3d; }
+  .e-pedido { background:rgba(37,99,235,.12); color:#1d4ed8; }
+  .e-pausado { background:rgba(255,209,0,.35); color:#6b5600; }
+  .e-suspendido { background:rgba(234,88,12,.14); color:#b2410a; }
+  .e-discontinuo { background:rgba(220,38,38,.12); color:#b91c1c; }
+  .e-inactivo { background:#ececec; color:#6b6b6b; }
+  .price-consultar { font-size:13px; font-weight:700; color:var(--text3); }
+
   .list-wrap { padding:12px 12px 90px; max-width:900px; margin:0 auto; }
   .product-card { display:grid; grid-template-columns:auto 1fr auto; gap:0 14px; padding:12px 14px; background:#fff; border-radius:var(--radius); margin-bottom:8px; border:1px solid var(--border); border-left:4px solid var(--amarillo); transition:border-color .15s, box-shadow .15s; }
   .product-card:hover { box-shadow:0 4px 14px rgba(0,0,0,.07); }
@@ -75,7 +94,7 @@
   .code { font-size:12px; font-weight:700; color:#000; background:var(--amarillo); border-radius:var(--pill); padding:3px 8px; line-height:1.2; }
   .medida { font-size:11px; color:var(--text3); font-weight:500; margin-top:5px; padding-left:2px; }
   .info-col { display:flex; flex-direction:column; justify-content:center; min-width:0; }
-  .product-name { font-size:14px; font-weight:700; color:#000; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .product-name { font-size:14px; font-weight:700; color:#000; line-height:1.3; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; word-break:break-word; }
   .product-color { font-size:12px; color:var(--tinta); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .price-col { display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:2px; min-width:90px; }
   .price-original { font-size:12px; color:var(--text3); font-weight:500; text-decoration:line-through; }
@@ -192,6 +211,7 @@
     </label>
     <span class="results-badge" id="resultsBadge"></span>
   </div>
+  <div class="chips" id="chips"></div>
 </div></div>
 
 <div class="list-wrap" id="listWrap"><div class="loading">Cargando productos...</div></div>
@@ -230,6 +250,7 @@ const CONFIG = {
   datos: 'productos.json',            // catálogo
   vendedores: 'vendedores.txt',       // CODIGO,TELEFONO por línea
   iva: 1.21,
+  preciosConIva: false,               // ¿la columna PRECIO del Excel ya incluye IVA? true = sí, false = no
   pageSize: 40,
   legal: [
     'La información contenida en la presente lista de precios tiene carácter meramente informativo y no constituye una oferta comercial vinculante.',
@@ -252,6 +273,8 @@ let ALL = [];           // [{codigo,nombre,color,canmed,med,precio,_q}]
 let filtered = [];
 let shown = 0;
 let dto = 0, conIva = true, query = '';
+let ESTADOS = [];
+const estadosSel = new Set();   // vacío = todos
 let vendedorTel = null, vendorMode = false;
 const cart = {};
 
@@ -260,7 +283,10 @@ const fmt = n => '$' + Math.round(n).toLocaleString('es-AR');
 const fmtMedida = (c, m) => (c && m) ? `${c} ${m}` : '';
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const norm = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+// p.precio se guarda siempre CON IVA
 const base = p => conIva ? p.precio : p.precio / CONFIG.iva;
+const estadoClase = e => ({ 'ACTIVO':'e-activo', 'ACTIVO VEP':'e-activo', 'A PEDIDO':'e-pedido', 'PAUSADO':'e-pausado', 'SUSPENDIDO':'e-suspendido', 'DISCONTINUO':'e-discontinuo', 'INACTIVO':'e-inactivo' }[e] || 'e-inactivo');
+const titulo = e => e.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()).replace('Vep', 'VEP');
 
 // Header
 $('logo').innerHTML = CONFIG.logo
@@ -275,11 +301,15 @@ fetch(CONFIG.datos)
   .then(r => r.ok ? r.json() : Promise.reject())
   .then(data => {
     if (data.fecha) $('dateBadge').textContent = 'Lista al ' + data.fecha; else $('dateBadge').remove();
+    ESTADOS = data.estados;
+    const factor = CONFIG.preciosConIva ? 1 : CONFIG.iva;
+    // fila: [codigo, detalle, indiceRubro, indiceEstado, precio]
     ALL = data.productos.map(r => {
-      const p = { codigo:String(r[0]), nombre:r[1]||'', color:r[2]||'', canmed:r[3]||'', med:r[4]||'', precio:Number(r[5])||0 };
-      p._q = norm([p.codigo, p.nombre, p.color, p.canmed + ' ' + p.med, p.canmed + p.med].join(' '));
+      const p = { codigo:String(r[0]), nombre:r[1]||'', color:data.rubros[r[2]]||'', estado:data.estados[r[3]]||'', canmed:'', med:'', precio:(Number(r[4])||0) * factor };
+      p._q = norm(p.codigo + ' ' + p.nombre + ' ' + p.color);
       return p;
     });
+    renderChips();
     applyFilter();
   })
   .catch(() => {
@@ -289,8 +319,8 @@ fetch(CONFIG.datos)
 // Búsqueda: todas las palabras tienen que aparecer (en cualquier orden)
 function applyFilter() {
   const words = norm(query).split(/\s+/).filter(Boolean);
-  filtered = words.length ? ALL.filter(p => words.every(w => p._q.includes(w))) : ALL;
-  $('resultsBadge').textContent = filtered.length.toLocaleString('es-AR') + (words.length ? ' resultados' : ' productos');
+  filtered = ALL.filter(p => (!estadosSel.size || estadosSel.has(p.estado)) && words.every(w => p._q.includes(w)));
+  $('resultsBadge').textContent = filtered.length.toLocaleString('es-AR') + (words.length || estadosSel.size ? ' resultados' : ' productos');
   shown = 0;
   $('listWrap').innerHTML = '';
   if (!filtered.length) {
@@ -317,14 +347,35 @@ function highlight(text) {
   return out.replace(re, '<mark>$1</mark>');
 }
 
+// Botones de filtro: "Todos" + uno por estado (se pueden combinar)
+function renderChips() {
+  const cuenta = {};
+  ALL.forEach(p => cuenta[p.estado] = (cuenta[p.estado] || 0) + 1);
+  const n = x => x.toLocaleString('es-AR');
+  $('chips').innerHTML =
+    `<button class="chip${estadosSel.size ? '' : ' on'}" data-e="">Todos<b>${n(ALL.length)}</b></button>` +
+    ESTADOS.map(e => `<button class="chip${estadosSel.has(e) ? ' on' : ''}" data-e="${esc(e)}">${esc(titulo(e))}<b>${n(cuenta[e] || 0)}</b></button>`).join('');
+}
+$('chips').addEventListener('click', ev => {
+  const b = ev.target.closest('.chip');
+  if (!b) return;
+  const e = b.dataset.e;
+  if (!e) estadosSel.clear();
+  else estadosSel.has(e) ? estadosSel.delete(e) : estadosSel.add(e);
+  renderChips();
+  applyFilter();
+});
+
 function card(p) {
   const pb = base(p), pf = pb * (1 - dto / 100);
-  const price = dto > 0
+  const price = !p.precio
+    ? `<div class="price-consultar">Consultar</div>`
+    : dto > 0
     ? `<div class="price-original">${fmt(pb)}</div><div class="price-final">${fmt(pf)}</div><div class="dto-tag">-${dto}%</div>`
     : `<div class="price-only">${fmt(pb)}</div>`;
   const add = vendorMode ? `<div class="add-col"><button class="add-btn" data-code="${esc(p.codigo)}" onclick="addToCart(this)">+</button></div>` : '';
   return `<div class="product-card${vendorMode ? ' has-cart' : ''}">
-    <div class="code-col"><div class="code">${highlight(p.codigo)}</div>${p.canmed && p.med ? `<div class="medida">${esc(fmtMedida(p.canmed, p.med))}</div>` : ''}</div>
+    <div class="code-col"><div class="code">${highlight(p.codigo)}</div>${p.estado ? `<div class="estado ${estadoClase(p.estado)}">${esc(titulo(p.estado))}</div>` : ''}</div>
     <div class="info-col"><div class="product-name">${highlight(p.nombre)}</div>${p.color ? `<div class="product-color">${highlight(p.color)}</div>` : ''}</div>
     <div class="price-col">${price}</div>${add}
   </div>`;
