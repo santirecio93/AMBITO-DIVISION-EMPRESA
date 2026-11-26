@@ -498,8 +498,8 @@ const fmt = n => '$' + Math.round(n).toLocaleString('es-AR');
 const fmtMedida = (c, m) => (c && m) ? `${c} ${m}` : '';
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const norm = s => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-// p.precio se guarda siempre CON IVA
-const base = p => conIva ? p.precio : p.precio / CONFIG.iva;
+// p.precio se guarda CON IVA; p.iva es el factor de IVA de ese producto (1.21 o 1.105)
+const base = p => conIva ? p.precio : p.precio / p.iva;
 const estadoClase = e => ({ 'ACTIVO':'e-activo', 'ACTIVO VEP':'e-activo', 'A PEDIDO':'e-pedido', 'PAUSADO':'e-pausado', 'SUSPENDIDO':'e-suspendido', 'DISCONTINUO':'e-discontinuo', 'INACTIVO':'e-inactivo' }[e] || 'e-inactivo');
 const titulo = e => e.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()).replace('Vep', 'VEP');
 
@@ -518,10 +518,11 @@ fetch(CONFIG.datos + '?r=2', { cache: 'no-cache' })
     fechaLista = data.fecha || '';
     if (data.fecha) $('dateBadge').textContent = 'Lista al ' + data.fecha; else $('dateBadge').remove();
     ESTADOS = data.estados;
-    const factor = CONFIG.preciosConIva ? 1 : CONFIG.iva;
-    // fila: [codigo, detalle, indiceRubro, indiceEstado, precio]
+    // fila: [codigo, detalle, indiceRubro, indiceEstado, precio sin IVA, (%IVA si no es 21)]
     ALL = data.productos.map(r => {
-      const p = { codigo:String(r[0]), nombre:r[1]||'', color:data.rubros[r[2]]||'', estado:data.estados[r[3]]||'', canmed:'', med:'', precio:(Number(r[4])||0) * factor };
+      const p = { codigo:String(r[0]), nombre:r[1]||'', color:data.rubros[r[2]]||'', estado:data.estados[r[3]]||'', canmed:'', med:'', iva:0, precio:0 };
+      p.iva = 1 + (r[5] ?? 21) / 100;
+      p.precio = (Number(r[4])||0) * (CONFIG.preciosConIva ? 1 : p.iva);
       p._q = norm(p.codigo + ' ' + p.nombre + ' ' + p.color);
       return p;
     });
@@ -952,15 +953,15 @@ async function descargarLista() {
   try {
     const X = await cargarXLSX();
     const iva = conIva ? 'c/IVA' : 's/IVA';
-    const cab = ['Código', 'Detalle', 'Rubro', 'Estado', `Precio lista ${iva}`];
+    const cab = ['Código', 'Detalle', 'Rubro', 'Estado', 'IVA %', `Precio lista ${iva}`];
     if (hayDescuento()) cab.push(`Descuento %`, `Precio final ${iva}`);
     const filas = filtered.map(p => {
-      const f = [p.codigo, p.nombre, p.color, titulo(p.estado), r2(base(p))];
+      const f = [p.codigo, p.nombre, p.color, titulo(p.estado), r2((p.iva - 1) * 100), r2(base(p))];
       if (hayDescuento()) f.push(dtoDe(p), r2(conDescuento(p)));
       return f;
     });
     const ws = X.utils.aoa_to_sheet([cab, ...filas]);
-    ws['!cols'] = [{ wch: 10 }, { wch: 55 }, { wch: 28 }, { wch: 12 }, { wch: 16 }, { wch: 11 }, { wch: 16 }];
+    ws['!cols'] = [{ wch: 10 }, { wch: 55 }, { wch: 28 }, { wch: 12 }, { wch: 7 }, { wch: 16 }, { wch: 11 }, { wch: 16 }];
     ws['!autofilter'] = { ref: ws['!ref'] };
     const wb = X.utils.book_new();
     X.utils.book_append_sheet(wb, ws, 'Lista de precios');
